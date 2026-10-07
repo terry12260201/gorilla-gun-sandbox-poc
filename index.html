@@ -1,0 +1,2065 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gorilla Gun 沙盒模式 POC</title>
+<style>
+  :root{--ink:#15161a;--gold:#d9a93f;--gold2:#ffd77a;--card:rgba(20,21,26,.84);--line:rgba(255,255,255,.08);--txt:#ececea;--mute:#9a9b9f}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#0c0d11;color:var(--txt);font:13px/1.5 "PingFang TC","Noto Sans TC",system-ui,sans-serif;overflow:hidden}
+  #c{display:block;width:100%;height:100%}
+  #ui{position:fixed;left:14px;top:14px;width:318px;max-height:calc(100% - 28px);overflow:auto;background:var(--card);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:16px;padding:14px 16px 12px;scrollbar-width:thin}
+  #ui h1{font-size:15px;margin:0 0 2px;letter-spacing:.5px}
+  #ui h1 b{color:var(--gold)}
+  #ui .sub{color:var(--mute);font-size:11.5px;margin-bottom:8px}
+  details{border-top:1px solid var(--line);padding:6px 0 4px}
+  summary{cursor:pointer;font-size:11.5px;color:var(--gold);letter-spacing:1px;list-style:none;display:flex;justify-content:space-between;align-items:center}
+  summary::after{content:"▾";color:var(--mute)}
+  details:not([open]) summary::after{content:"▸"}
+  summary small{color:var(--mute);letter-spacing:0;font-weight:400}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:5px 0}
+  .row label{flex:1;color:var(--txt)}
+  .row small,.hint{color:var(--mute)}
+  .hint{font-size:11px;line-height:1.45;margin:4px 0 2px}
+  .hint b{color:var(--gold2);font-weight:600}
+  input[type=range]{width:120px;accent-color:var(--gold)}
+  select,button{background:#23242b;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:4px 8px;font:inherit;font-size:12px}
+  button{cursor:pointer}
+  button:hover{border-color:var(--gold)}
+  button.gold{background:var(--gold);color:#1a1405;font-weight:600;border-color:transparent}
+  button.mini{padding:2px 7px;font-size:11px}
+  .seg{display:flex;gap:4px;flex-wrap:wrap}
+  .seg button{padding:4px 7px}
+  .seg button.on{background:var(--gold);color:#1a1405;border-color:transparent}
+  input[type=checkbox]{accent-color:var(--gold);width:16px;height:16px}
+  .wgrp{margin:6px 0 2px;color:var(--mute);font-size:11px;letter-spacing:1px}
+  .wrow{display:grid;grid-template-columns:18px 1fr 34px 36px;align-items:center;gap:6px;margin:3px 0}
+  .wrow kbd{font:11px ui-monospace,Menlo,monospace;color:var(--gold2);background:#1c1d23;border:1px solid var(--line);border-radius:5px;padding:1px 4px;text-align:center}
+  #stats{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-variant-numeric:tabular-nums;font-size:12px}
+  #stats span{color:var(--mute)}
+  #stats b{color:var(--gold2);font-weight:600}
+  #toolkit{position:fixed;right:14px;bottom:14px;background:var(--card);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:12px;min-width:210px}
+  #toolkit h2{font-size:11.5px;color:var(--gold);margin:0 0 6px;letter-spacing:1px}
+  #toolkit .r{display:flex;justify-content:space-between;gap:12px;padding:1px 0;color:var(--txt)}
+  #toolkit .r b{color:var(--gold2);font-variant-numeric:tabular-nums;font-weight:600;min-width:28px;text-align:right}
+  #help{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);color:var(--mute);font-size:12px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 14px;white-space:nowrap}
+  #help b{color:var(--gold2);font-weight:600}
+  #slots{position:fixed;left:352px;top:14px;display:flex;gap:6px}
+  @media (max-width:720px){#slots{display:none}}
+  .slot{position:relative;width:66px;height:66px;border-radius:12px;background:var(--card);border:1px solid rgba(217,169,63,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;overflow:hidden;backdrop-filter:blur(8px)}
+  .slot.empty{border-style:dashed;border-color:var(--line);cursor:default}
+  .slot .ic{font-size:22px;line-height:1}
+  .slot .nm{font-size:10.5px;color:var(--txt)}
+  .slot.empty .nm{color:var(--mute)}
+  .slot kbd{position:absolute;right:4px;top:3px;font:10px ui-monospace,Menlo,monospace;color:var(--gold2)}
+  .slot .cd{position:absolute;left:0;right:0;bottom:0;height:0;background:rgba(217,169,63,.28);pointer-events:none}
+  #toast{position:fixed;left:calc(50% + 160px);top:90px;transform:translateX(-50%);background:var(--card);border:1px solid rgba(217,169,63,.5);border-radius:999px;padding:6px 16px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none}
+  #toast b{color:var(--gold2)}
+  .lbl{position:fixed;transform:translate(-50%,-100%);pointer-events:none;background:rgba(14,15,19,.78);border:1px solid rgba(217,169,63,.55);color:#fff;font-size:11.5px;padding:3px 8px;border-radius:8px;white-space:nowrap}
+  .lbl::after{content:"";position:absolute;left:50%;top:100%;width:1px;height:14px;background:rgba(217,169,63,.7)}
+  .lbl i{color:var(--gold2);font-style:normal;font-weight:600}
+  #flash{position:fixed;inset:0;pointer-events:none;background:#fff;opacity:0}
+  @media (max-width:720px){#ui{width:calc(100% - 28px);max-height:46%}#toolkit{display:none}#help{display:none}}
+  /* ── 沙盒 POC 新增：模型縮圖、玩家 HP、受擊紅框、Boss 血條 ── */
+  .slot img{width:40px;height:40px;object-fit:contain;filter:drop-shadow(0 2px 3px rgba(0,0,0,.6))}
+  .wrow label small{color:var(--mute);font-size:10.5px}
+  #modelStatus{color:var(--mute);font-size:11px}
+  #hpBox{position:fixed;left:50%;bottom:56px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:12px;backdrop-filter:blur(8px)}
+  #hpBox .bar{width:180px;height:9px;border-radius:9px;background:#2a1418;overflow:hidden}
+  #hpBox .bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff4d5e,#ff9a5e);transition:width .15s}
+  #hpBox b{color:var(--gold2);font-variant-numeric:tabular-nums;min-width:26px;text-align:right}
+  #hpBox.god .bar i{background:linear-gradient(90deg,#d9a93f,#ffd77a)}
+  #hurt{position:fixed;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 90px 24px rgba(255,36,60,.9);border:3px solid rgba(255,60,80,.8)}
+  #bossBar{position:fixed;transform:translate(-50%,-100%);pointer-events:none;display:none;width:190px;text-align:center}
+  #bossBar .nm{font-size:12px;color:#fff;text-shadow:0 1px 3px #000;margin-bottom:3px;white-space:nowrap}
+  #bossBar .nm small{color:#c9a7ff;margin-left:4px}
+  #bossBar .bar{height:8px;border-radius:8px;background:rgba(20,10,30,.85);border:1px solid rgba(181,140,255,.6);overflow:hidden}
+  #bossBar .bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#8cff3a,#b58cff);transition:width .12s}
+  #hpBox span{white-space:nowrap}
+  @media (max-width:720px){#hpBox{bottom:14px}#hpBox .bar{width:120px}#toast{left:50%;top:auto;bottom:60px;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="flash"></div>
+<div id="toast"></div>
+<div id="slots"></div>
+<div id="hurt"></div>
+<div id="bossBar"><div class="nm">CoffinHopper 骷髏球<small id="bossPhase">階段 1</small></div><div class="bar"><i id="bossFill"></i></div></div>
+<div id="hpBox"><span>猩猩 HP</span><div class="bar"><i id="hpFill"></i></div><b id="hpTxt">100</b></div>
+
+<div id="ui">
+  <h1>Gorilla Gun <b>沙盒模式 POC</b></h1>
+  <div class="sub">元素三階 × 身上 6 把 × Boss 實測。特效全程式生成；角色、武器、Boss 用南瓜的模型。所有武器的命中都會套用下面的元素。</div>
+
+  <details open>
+    <summary>角色與 Boss <small id="modelStatus">模型載入中…</small></summary>
+    <div class="row"><label>外觀</label><select id="look"><option value="proc">程式生成猩猩</option><option value="rambo" selected>Rambo</option><option value="knight">Knight</option><option value="exorcist">Exorcist</option></select></div>
+    <div class="row"><label>快速換裝</label><div class="seg"><button id="presetVR">VR 第一人稱組</button><button id="presetGun">模型展示組</button></div></div>
+    <div class="row"><button class="gold" id="bossBtn" style="flex:1">召喚 Boss（B）</button><button id="bossHalfBtn" title="測試用：直接把 Boss 打到 49% 進入階段 2">扣到半血</button></div>
+    <div class="row"><label>無敵（受擊仍有紅框，不扣血）</label><input type="checkbox" id="god"></div>
+    <div class="hint">Boss：CoffinHopper 骷髏球。彈跳保持 6–9m、每 3 秒骷髏三連彈、每 8 秒跳砸（紅圈預警 0.9 秒）；半血進階段 2：骷髏環射＋移速 ×1.3。</div>
+  </details>
+
+  <details open>
+    <summary>元素（主 × 副，各 3 階）<small id="compoundName"></small></summary>
+    <div class="row"><label>主元素</label><div class="seg" id="pSeg"></div></div>
+    <div class="row"><label>主元素階級</label><div class="seg" id="pTierSeg"><button data-v="1">I</button><button data-v="2" class="on">II</button><button data-v="3">III</button></div></div>
+    <div class="row"><label>副元素</label><div class="seg" id="sSeg"></div></div>
+    <div class="row"><label>副元素階級</label><div class="seg" id="sTierSeg"><button data-v="1" class="on">I</button><button data-v="2">II</button><button data-v="3">III</button></div></div>
+    <div class="hint" id="elemHint"></div>
+  </details>
+
+  <details open>
+    <summary>武器庫（34 把，身上最多帶 6 把）<small>勾＝裝備並自動施放</small></summary>
+    <div class="row"><label>自動施放（勾選的武器冷卻好就放）</label><input type="checkbox" id="autoCast" checked></div>
+    <div id="weaponList"></div>
+  </details>
+
+  <details>
+    <summary>V1 基礎（無人機／鐵鎚／連鎖／落雷）</summary>
+    <div class="row"><label>肩上無人機：自動主火力</label><input type="checkbox" id="drone" checked></div>
+    <div class="row"><label>祝福鐵鎚 <small id="hammersV">4</small></label><input type="range" id="hammers" min="0" max="8" step="1" value="2"></div>
+    <div class="row"><label>鐵鎚軌跡</label><div class="seg" id="hammerSeg"><button data-v="spiral" class="on">螺旋外擴</button><button data-v="orbit">固定環繞</button></div></div>
+    <div class="row"><label>左手：連鎖閃電（跳 <small id="chainJumpsV">4</small> 次）</label><input type="checkbox" id="chain"></div>
+    <div class="row"><label></label><input type="range" id="chainJumps" min="1" max="8" step="1" value="4"></div>
+    <div class="row"><label>天空落雷</label><div class="seg" id="skySeg"><button data-v="off" class="on">關</button><button data-v="fast">快速</button><button data-v="multi">多重</button><button data-v="area">範圍</button></div></div>
+    <div class="row"><label>擊殺爆炸卡（連鎖反應）</label><input type="checkbox" id="killBoom" checked></div>
+    <div class="row"><button class="gold" id="slamBtn" style="flex:1">雙手砸地 AOE（Space）</button></div>
+  </details>
+
+  <details>
+    <summary>打擊感參數</summary>
+    <div class="row"><label>怪物受擊停頓 <small id="hitstopV">70 ms</small></label><input type="range" id="hitstop" min="0" max="160" step="10" value="70"></div>
+    <div class="row"><label>擊退力道 <small id="knockV">6</small></label><input type="range" id="knock" min="0" max="14" step="1" value="6"></div>
+    <div class="row"><label>傷害數字</label><input type="checkbox" id="numbers" checked></div>
+    <div class="row"><label>位置標籤</label><input type="checkbox" id="labels"></div>
+    <div class="row"><label>賽璐璐分階（VFXGen 風硬邊）</label><input type="checkbox" id="toon"></div>
+    <div class="row"><label>第一人稱預覽（VR 視角，拖曳＝轉頭）</label><input type="checkbox" id="fpv"></div>
+  </details>
+
+  <details open>
+    <summary>怪群與數據</summary>
+    <div class="row"><label>每秒生怪 <small id="spawnRateV">4</small></label><input type="range" id="spawnRate" min="0" max="12" step="1" value="4"></div>
+    <div class="row"><label>同屏上限 <small id="maxEnemiesV">80</small></label><input type="range" id="maxEnemies" min="10" max="150" step="10" value="80"></div>
+    <div class="row"><button id="waveBtn" style="flex:1">叫一波（+30）</button><button id="clearBtn">清場</button></div>
+    <div id="stats" style="margin-top:6px">
+      <span>FPS</span><b id="sFps">—</b>
+      <span>Draw calls</span><b id="sCalls">—</b>
+      <span>同屏怪物</span><b id="sAlive">0</b>
+      <span>擊殺／分</span><b id="sKpm">0</b>
+      <span>總擊殺</span><b id="sKills">0</b>
+      <span>最長連鎖爆炸</span><b id="sChain">0</b>
+    </div>
+  </details>
+</div>
+
+<div id="toolkit">
+  <h2>特效套件：8 個基本元件（即時數量）</h2>
+  <div class="r"><span>① 震波環 Ring</span><b id="tRing">0</b></div>
+  <div class="r"><span>② 爆裂球 Burst</span><b id="tBurst">0</b></div>
+  <div class="r"><span>③ 光束／閃電 Bolt</span><b id="tBolt">0</b></div>
+  <div class="r"><span>④ 拖尾 Trail（投射物）</span><b id="tTrail">0</b></div>
+  <div class="r"><span>⑤ 火花／碎塊 Spark</span><b id="tSpark">0</b></div>
+  <div class="r"><span>⑥ 地面貼花 Decal</span><b id="tCrack">0</b></div>
+  <div class="r"><span>⑦ 光柱 Pillar</span><b id="tPillar">0</b></div>
+  <div class="r"><span>⑧ 傷害數字 Number</span><b id="tNum">0</b></div>
+</div>
+
+<div id="help"><b>WASD</b> 移動　<b>Space</b> 砸地　<b>B</b> 召喚 Boss　點上方格子或按面板上的鍵施放　<b>拖曳</b> 轉鏡頭　<b>滾輪</b> 縮放</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+<!-- models.js：assets/**/*.glb 轉 base64（node tools/build-models.mjs 產生），讓 file:// 雙擊也能載入模型 -->
+<script src="models.js"></script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const TAU = Math.PI * 2;
+const rnd = (a = 1, b = 0) => b + Math.random() * (a - b);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const UP = new THREE.Vector3(0, 1, 0);
+
+// ═════════════════════ 沙盒 POC 設定表（同事最常改的都在這裡） ═════════════════════
+// 南瓜的模型（assets/weapons/*.glb，槍管朝 +X）
+const MODEL_INFO = {
+  basegun_a: '左輪', basegun_b: '科幻手槍', basegun_c: '霰彈槍', basegun_d: '1911 手槍',
+  bamboocrossbow: '竹管連弩', crossbow: '藤蔓生物弩', explosivecrossbow: '骨頭爆裂弩',
+  flamethrower: '龍頭骨噴火器', holywater: '天使聖水砲', rambo_basegun: '藍波機槍', smg: '彩色水槍',
+};
+// 武器 ↔ 模型對照：[模型 key, 貼合度]。null＝保留原本程式生成造型（身上槽位改顯示 emoji）
+// 貼合＝語意直接對上；借用＝沒有專屬模型，先借最接近的一把當「發射器」
+const WEAPON_MODEL = {
+  shotgun: ['basegun_c', '貼合'],           // 霰彈 → 霰彈槍
+  missiles: ['rambo_basegun', '貼合'],      // 追蹤飛彈 ×5 → 藍波機槍（連發）
+  bomb: ['explosivecrossbow', '貼合'],      // 炸彈 → 骨頭爆裂弩
+  gas: ['smg', '貼合'],                     // 毒霧彈 → 彩色水槍（噴毒液）
+  fireball: ['flamethrower', '貼合'],       // 大火球 → 龍頭骨噴火器
+  frozenorb: ['basegun_b', '借用'],         // 冰封球 → 科幻手槍（能量球）
+  javelin: ['bamboocrossbow', '貼合'],      // 光標槍 → 竹管連弩（射長條投射物）
+  web: ['crossbow', '貼合'],                // 蜘蛛網／冰網 → 藤蔓生物弩（射藤網）
+  trap: ['explosivecrossbow', '借用'],      // 陷阱 → 骨頭爆裂弩（射地雷）
+  turret: ['basegun_a', '借用'],            // 哨塔 → 左輪（點射）
+  storm: ['basegun_d', '借用'],             // 雷暴雲 → 1911（朝天鳴槍召雷）
+  hole: ['basegun_b', '借用'],              // 黑洞 → 科幻手槍（奇點彈）
+  flame: ['flamethrower', '貼合'],          // 噴火槍 → 龍頭骨噴火器
+  beam: ['holywater', '貼合'],              // 合掌光束 → 天使聖水砲
+  aura: ['holywater', '貼合'],              // 聖光環 → 天使聖水砲
+  // 以下保留程式生成：爪擊、旋風衝鋒、迴旋鐮刀、天降大拳頭、迴旋鋸刃、大手裡劍、地刺區、裂地、
+  // 隕石雨、三頭火龍、龍捲風、小幫手、地獄手、香蕉鏢、椰子雨、捶胸怒吼、防護罩、冰牆、時緩領域
+};
+// 身上 6 個槽位（相對猩猩：x 右、y 高、z 前；負 z＝背後），像背後展開的一圈槍
+const SLOT_OFFSETS = [[-1.0, 1.95, -.5], [1.0, 1.95, -.5], [-1.6, 1.5, -.35], [1.6, 1.5, -.35], [-.5, 2.45, -.65], [.5, 2.45, -.65]];
+// 外觀：英雄模型（上半身 T-pose）。scale／y 讓它跟原本猩猩差不多大
+const HERO_MODELS = { rambo: 'hero/player_rambo', knight: 'hero/player_knight', exorcist: 'hero/player_exorcist' };
+const HERO_FIT = { scale: 1.35, y: .5, hand: [1.2, 1.05, .05] };
+// Boss：CoffinHopper 骷髏球（主專案照同一份規格做）
+const BOSS = {
+  model: 'boss/coffin_hopper', scale: 4.2, size: 1.6, // 模型原高 ~0.96 → ×4.2 ≈ 4m ≈ 猩猩 2.5 倍；size＝命中半徑基準
+  hpMul: 25,                       // HP ＝ brute(12) × 25 ＝ 300
+  speed: 3.2, keepMin: 6, keepMax: 9, hopH: .9,
+  tri: { every: 3, count: 3, spread: .32, speed: 6, homing: 1.1, dmg: 8 },          // 骷髏三連彈
+  slam: { every: 8, tele: .9, radius: 4, jump: .6, height: 5, dmg: 20 },          // 跳砸
+  phase2: { at: .5, ringEvery: 5, ringCount: 12, speedMul: 1.3, shockR: 8, shockDmg: 12 }, // 階段 2
+  hitAnimCd: 1.2,                  // Hit 動畫最短間隔（不打斷攻擊）
+};
+const PLAYER_HP = 100;
+
+// ───────────────────────── 元素設定 ─────────────────────────
+const ELEM = {
+  holy:  { name: '聖光', core: 0xfff6d6, main: 0xffc94d, dark: 0xe07a00, tier: ['命中落下小光柱、額外 +30% 傷害', '擊殺 → 審判光柱 AOE', '聖印：同一隻被打 3 下 → 十字光爆'] },
+  fire:  { name: '火焰', core: 0xfff1c0, main: 0xff7a1a, dark: 0xc1230a, tier: ['燃燒 DoT（火苗往上冒）', '燃燒的怪死亡 → 火圈引燃鄰居', '死亡留下火海 3 秒'] },
+  ice:   { name: '冰霜', core: 0xeaffff, main: 0x7fe0ff, dark: 0x2466d6, tier: ['減速、疊層（冰晶閃）', '疊 3 層 → 整隻凍住 1.6 秒', '打凍住的怪 → 碎裂＋冰爆擴散'] },
+  volt:  { name: '雷電', core: 0xffffff, main: 0xb58cff, dark: 0x5a2fd1, tier: ['命中彈跳 1 次', '彈跳 3 次', '被電的怪變導體：留下 2 秒靜電場'] },
+  toxic: { name: '劇毒', core: 0xf0ffd0, main: 0x8cff3a, dark: 0x2f8a16, tier: ['中毒疊層 DoT（綠泡）', '死亡留下毒池', '毒池生出毒雲，自己飄去找怪'] },
+};
+// 混搭：副元素只送它的 I 階行為 ＋ 一條「招牌規則」，不是一整套新特效
+const COMPOUND = {
+  'toxic+volt': { name: '輻射', desc: '電弧經過的怪都中毒' },
+  'fire+toxic': { name: '毒氣爆', desc: '燃燒中的怪踩進毒池 → 毒池爆炸' },
+  'fire+ice':   { name: '蒸氣熱震', desc: '同一隻又燒又凍 → 額外爆發、周圍減速' },
+  'ice+volt':   { name: '超導', desc: '電弧經過冰凍／減速的怪不衰減、多跳 2 次' },
+};
+const EL = { p: 'fire', pT: 2, s: 'volt', sT: 1 };
+const C = k => new THREE.Color(ELEM[EL.p][k]);
+const S = k => new THREE.Color(ELEM[EL.s === 'none' ? EL.p : EL.s][k]);
+const EC = (el, k = 'main') => new THREE.Color(ELEM[el][k]);
+const hasEl = el => EL.p === el || EL.s === el;
+const compoundKey = () => EL.s === 'none' ? null : [EL.p, EL.s].sort().join('+');
+const hasCompound = k => compoundKey() === k;
+const GOLD = new THREE.Color(0xffc94d), WHITE = new THREE.Color(0xffffff), PALE_ICE = new THREE.Color(0xcfefff);
+
+const TOON = { value: 0 }; // 賽璐璐分階（VFXGen 風）
+const W = { hammers: 2, hammerMode: 'spiral', chain: false, chainJumps: 4, sky: 'off', killBoom: true, hitstop: 70, knock: 6,
+  spawnRate: 4, maxEnemies: 80, drone: true, numbers: true, labels: false, autoCast: true, god: false, look: 'rambo' };
+
+// ───────────────────────── 場景 ─────────────────────────
+const canvas = $('#c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0c0d11);
+scene.fog = new THREE.FogExp2(0x0c0d11, 0.024);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
+scene.add(new THREE.HemisphereLight(0x8a94b8, 0x241a10, 0.95));
+const sun = new THREE.DirectionalLight(0xfff0dd, 1.1); sun.position.set(6, 12, 4); scene.add(sun);
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(90, 90), new THREE.ShaderMaterial({
+  uniforms: { uGold: { value: new THREE.Color(0xd9a93f) } },
+  vertexShader: `varying vec3 vW; void main(){ vW=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `varying vec3 vW; uniform vec3 uGold;
+    void main(){
+      vec2 g=abs(fract(vW.xz*0.5)-0.5)/fwidth(vW.xz*0.5); float line=1.0-min(min(g.x,g.y),1.0);
+      vec2 g2=abs(fract(vW.xz*0.1)-0.5)/fwidth(vW.xz*0.1); float line2=1.0-min(min(g2.x,g2.y),1.0);
+      float d=length(vW.xz); float fade=smoothstep(30.0,4.0,d);
+      vec3 col=vec3(0.070,0.073,0.086)+uGold*(line*0.10+line2*0.22)*fade;
+      gl_FragColor=vec4(col,1.0); }`,
+}));
+floor.material.extensions.derivatives = true;
+floor.rotation.x = -Math.PI / 2; scene.add(floor);
+
+// ───────────────────────── 玩家 ─────────────────────────
+const player = { pos: new THREE.Vector3(), yaw: 0, group: new THREE.Group(), bob: 0, slamCd: 0, slamAnim: 0, whirl: null };
+{
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2a2b33, roughness: .9 });
+  const fur = new THREE.MeshStandardMaterial({ color: 0x3a3c47, roughness: .95 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(.58, 18, 14), fur); body.position.y = .72; body.scale.set(1, .9, .85);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.34, 16, 12), dark); head.position.set(0, 1.28, .22);
+  const eyeM = new THREE.MeshBasicMaterial({ color: 0xffd77a });
+  const eL = new THREE.Mesh(new THREE.SphereGeometry(.05, 8, 8), eyeM); eL.position.set(-.12, 1.33, .52);
+  const eR = eL.clone(); eR.position.x = .12;
+  const armG = new THREE.CylinderGeometry(.11, .14, .95, 10);
+  const aL = new THREE.Mesh(armG, dark); aL.position.set(-.55, .5, .25); aL.rotation.z = .25; aL.rotation.x = -.35;
+  const aR = aL.clone(); aR.position.x = .55; aR.rotation.z = -.25;
+  const hG = new THREE.SphereGeometry(.21, 12, 10);
+  const hL = new THREE.Mesh(hG, dark); hL.position.set(-.66, .2, .45);
+  const hR = new THREE.Mesh(hG, dark); hR.position.set(.66, .2, .45);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(.3, 12, 10), new THREE.MeshBasicMaterial({ color: C('main'), transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false }));
+  glow.position.copy(hL.position);
+  const drone = new THREE.Group();
+  drone.add(new THREE.Mesh(new THREE.OctahedronGeometry(.2, 0), new THREE.MeshStandardMaterial({ color: 0xffc94d, metalness: .7, roughness: .3, emissive: 0x6a4a10 })));
+  const dBarrel = new THREE.Mesh(new THREE.CylinderGeometry(.04, .05, .36, 8), new THREE.MeshStandardMaterial({ color: 0x2a2b33, roughness: .6 }));
+  dBarrel.rotation.x = Math.PI / 2; dBarrel.position.z = .22; drone.add(dBarrel); drone.position.set(.62, 1.62, -.05);
+  const proc = new THREE.Group(); proc.add(body, head, eL, eR, aL, aR); // 程式生成猩猩本體（換外觀時整組藏起來）
+  const hero = new THREE.Group(); hero.position.y = HERO_FIT.y; hero.visible = false; // 英雄模型掛點
+  player.group.add(proc, hero, hL, hR, glow, drone);
+  Object.assign(player, { hL, hR, glow, drone, droneBase: drone.position.clone(), head, eL, eR, proc, hero, handBase: new THREE.Vector3(.66, .2, .45) });
+  scene.add(player.group);
+}
+const fwd = () => new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw));
+
+// ───────────────────────── 共用暫存 ─────────────────────────
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _c = new THREE.Color();
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+const timers = []; // {t, fn} 延遲執行（取代 setTimeout，讓 step() 可控）
+const after = (t, fn) => timers.push({ t, fn });
+
+// ───────────────────────── 特效池（8 個基本元件） ─────────────────────────
+class Particles {
+  constructor(n) {
+    this.n = n;
+    this.mesh = new THREE.InstancedMesh(new THREE.TetrahedronGeometry(.1, 0), new THREE.MeshBasicMaterial(), n);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.mesh.frustumCulled = false;
+    this.p = Array.from({ length: n }, () => ({ alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), life: 0, max: 1, size: 1, col: new THREE.Color(), grav: 9.8, drag: .98, target: null, spin: 0, delay: 0 }));
+    for (let i = 0; i < n; i++) { this.mesh.setMatrixAt(i, ZERO); this.mesh.setColorAt(i, _c.set(0)); }
+    this.cursor = 0; this.active = 0; scene.add(this.mesh);
+  }
+  spawn(pos, vel, col, size, life, o = {}) {
+    const p = this.p[this.cursor]; this.cursor = (this.cursor + 1) % this.n;
+    p.alive = true; p.pos.copy(pos); p.vel.copy(vel); p.col.copy(col); p.size = size; p.life = p.max = life;
+    p.grav = o.grav ?? 9.8; p.drag = o.drag ?? .985; p.target = o.target ?? null; p.delay = o.delay ?? 0; p.spin = rnd(TAU);
+    return p;
+  }
+  update(dt) {
+    let a = 0;
+    for (let i = 0; i < this.n; i++) {
+      const p = this.p[i]; if (!p.alive) continue;
+      if (p.delay > 0) p.delay -= dt;
+      else {
+        p.life -= dt;
+        if (p.life <= 0) { p.alive = false; this.mesh.setMatrixAt(i, ZERO); continue; }
+        if (p.target) {
+          _v.copy(p.target).sub(p.pos); const d = _v.length();
+          if (d < .45) { p.alive = false; this.mesh.setMatrixAt(i, ZERO); continue; }
+          p.vel.addScaledVector(_v.normalize(), dt * 60); p.vel.multiplyScalar(.9);
+        } else { p.vel.y -= p.grav * dt; p.vel.multiplyScalar(p.drag); }
+        p.pos.addScaledVector(p.vel, dt);
+        if (p.pos.y < .06 && !p.target && p.grav > 0) { p.pos.y = .06; p.vel.y *= -.35; p.vel.x *= .6; p.vel.z *= .6; }
+      }
+      a++;
+      const k = Math.sqrt(clamp(p.life / p.max, 0, 1)) * p.size;
+      _q.setFromEuler(new THREE.Euler(p.spin + p.life * 7, p.spin * 1.3, 0));
+      this.mesh.setMatrixAt(i, _m.compose(p.pos, _q, _s.set(k, k, k)));
+      this.mesh.setColorAt(i, p.col);
+    }
+    this.active = a; this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+class AgedPool {
+  constructor(n, geo, frag) {
+    this.n = n;
+    this.age = new Float32Array(n).fill(1); this.seed = new Float32Array(n); this.w = new Float32Array(n).fill(.1);
+    geo.setAttribute('aAge', new THREE.InstancedBufferAttribute(this.age, 1).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(this.seed, 1));
+    geo.setAttribute('aW', new THREE.InstancedBufferAttribute(this.w, 1).setUsage(THREE.DynamicDrawUsage));
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uToon: TOON }, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+      vertexShader: `attribute float aAge; attribute float aSeed; attribute float aW;
+        varying vec2 vUv; varying float vAge; varying float vSeed; varying float vW; varying vec3 vCol;
+        void main(){ vUv=uv; vAge=aAge; vSeed=aSeed; vW=aW; vCol=instanceColor;
+          gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0); }`,
+      fragmentShader: 'uniform float uToon; float tq(float a){ return uToon>0.5 ? floor(a*3.0+0.5)/3.0 : a; }\n' + frag,
+    });
+    this.mesh = new THREE.InstancedMesh(geo, mat, n);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.mesh.frustumCulled = false;
+    for (let i = 0; i < n; i++) { this.mesh.setMatrixAt(i, ZERO); this.mesh.setColorAt(i, _c.set(0)); }
+    this.items = Array.from({ length: n }, () => ({ alive: false, t: 0, dur: 1 }));
+    this.cursor = 0; this.active = 0; scene.add(this.mesh);
+  }
+  spawn(matrix, col, dur, w = .1) {
+    const i = this.cursor; this.cursor = (this.cursor + 1) % this.n;
+    const it = this.items[i]; it.alive = true; it.t = 0; it.dur = dur;
+    this.mesh.setMatrixAt(i, matrix); this.mesh.setColorAt(i, col);
+    this.age[i] = 0; this.seed[i] = rnd(100); this.w[i] = w;
+    this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true; this.mesh.geometry.attributes.aSeed.needsUpdate = true;
+    return i;
+  }
+  kill(i) { const it = this.items[i]; if (!it.alive) return; it.alive = false; this.age[i] = 1; this.mesh.setMatrixAt(i, ZERO); this.mesh.instanceMatrix.needsUpdate = true; }
+  update(dt) {
+    let a = 0;
+    for (let i = 0; i < this.n; i++) {
+      const it = this.items[i]; if (!it.alive) continue;
+      it.t += dt; const k = it.t / it.dur;
+      if (k >= 1) { this.kill(i); continue; }
+      this.age[i] = k; a++;
+    }
+    this.active = a; this.mesh.geometry.attributes.aAge.needsUpdate = true; this.mesh.geometry.attributes.aW.needsUpdate = true;
+  }
+}
+const flatGeo = () => { const g = new THREE.PlaneGeometry(2, 2); g.rotateX(-Math.PI / 2); return g; };
+// ① 震波環
+const rings = new AgedPool(72, flatGeo(), `varying vec2 vUv; varying float vAge; varying float vW; varying vec3 vCol;
+  void main(){ float r=length(vUv*2.0-1.0); if(r>1.0) discard;
+    float e=pow(vAge,0.6); float w=vW*(1.0-vAge*0.5);
+    float a=smoothstep(w,0.0,abs(r-e)); a+=smoothstep(e,e-0.25,r)*0.12*(1.0-vAge); a*=(1.0-vAge);
+    gl_FragColor=vec4(vCol*(0.9+(1.0-vAge)*0.7),tq(a)*0.9); }`);
+// ⑥-a 地裂
+const cracks = new AgedPool(24, flatGeo(), `varying vec2 vUv; varying float vAge; varying float vSeed; varying vec3 vCol;
+  void main(){ vec2 p=vUv*2.0-1.0; float r=length(p); if(r>1.0) discard; float ang=atan(p.y,p.x);
+    float s1=pow(abs(sin(ang*5.0+vSeed+r*6.0)),28.0); float s2=pow(abs(sin(ang*9.0-vSeed*1.7+r*11.0)),40.0)*0.7;
+    float streak=(s1+s2)*smoothstep(1.0,0.25,r)*smoothstep(0.0,0.12,r); float glow=(1.0-r)*0.18;
+    float a=(streak*1.6+glow)*pow(1.0-vAge,1.6); gl_FragColor=vec4(vCol*(1.0+(1.0-vAge)*1.0),tq(a)*0.8); }`);
+// ⑥-b 地面池（火海／毒池／靜電場）：柔邊、會呼吸、尾段才淡出
+const discs = new AgedPool(24, flatGeo(), `varying vec2 vUv; varying float vAge; varying float vSeed; varying vec3 vCol;
+  void main(){ vec2 p=vUv*2.0-1.0; float r=length(p); if(r>1.0) discard; float ang=atan(p.y,p.x);
+    float wob=0.5+0.5*sin(ang*3.0+vSeed+vAge*40.0)*0.35+0.5*sin(ang*7.0-vSeed*2.0-vAge*55.0)*0.2;
+    float edge=smoothstep(1.0,0.55,r+wob*0.15); float core=smoothstep(0.6,0.0,r)*0.35;
+    float pulse=0.75+0.25*sin(vAge*60.0+vSeed); float fade=smoothstep(0.0,0.06,vAge)*smoothstep(1.0,0.78,vAge);
+    float a=(edge*0.42+core)*pulse*fade; gl_FragColor=vec4(vCol*1.1,tq(a)); }`);
+// ⑥-c 蜘蛛網／陷阱：放射線＋同心圈
+const webs = new AgedPool(16, flatGeo(), `varying vec2 vUv; varying float vAge; varying float vSeed; varying vec3 vCol;
+  void main(){ vec2 p=vUv*2.0-1.0; float r=length(p); if(r>1.0) discard; float ang=atan(p.y,p.x);
+    float rad=pow(abs(sin(ang*6.0+vSeed)),60.0); float rings=pow(abs(sin(r*22.0+sin(ang*6.0+vSeed)*1.2)),40.0);
+    float a=(rad+rings*0.8)*smoothstep(1.0,0.85,r)*smoothstep(1.0,0.9,vAge)*smoothstep(0.0,0.05,vAge);
+    gl_FragColor=vec4(vCol*1.2,tq(a)*0.9); }`);
+function flatM(pos, radius, rot = 0, y = .03) { return _m.compose(_v.set(pos.x, y, pos.z), _q.setFromAxisAngle(UP, rot), _s.set(radius, 1, radius)); }
+const ringAt = (pos, radius, col, dur = .45, w = .12) => rings.spawn(flatM(pos, radius, 0, .03 + rnd(.02)), col, dur, w);
+const crackAt = (pos, radius, col, dur = 1.6) => cracks.spawn(flatM(pos, radius, rnd(TAU), .02), col, dur);
+const discAt = (pos, radius, col, dur) => discs.spawn(flatM(pos, radius, rnd(TAU), .025), col, dur);
+const webAt = (pos, radius, col, dur) => webs.spawn(flatM(pos, radius, rnd(TAU), .03), col, dur);
+
+class Bursts { // ② 爆裂球
+  constructor(n) {
+    this.n = n; this.mesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshBasicMaterial({ blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }), n);
+    this.mesh.frustumCulled = false;
+    for (let i = 0; i < n; i++) { this.mesh.setMatrixAt(i, ZERO); this.mesh.setColorAt(i, _c.set(0)); }
+    this.items = Array.from({ length: n }, () => ({ alive: false, t: 0, dur: 1, r: 1, pos: new THREE.Vector3(), col: new THREE.Color() }));
+    this.cursor = 0; this.active = 0; scene.add(this.mesh);
+  }
+  spawn(pos, r, col, dur = .22) { const it = this.items[this.cursor]; this.cursor = (this.cursor + 1) % this.n; Object.assign(it, { alive: true, t: 0, dur, r }); it.pos.copy(pos); it.col.copy(col); }
+  update(dt) {
+    let a = 0;
+    this.items.forEach((it, i) => {
+      if (!it.alive) return; it.t += dt; const k = it.t / it.dur;
+      if (k >= 1) { it.alive = false; this.mesh.setMatrixAt(i, ZERO); return; }
+      a++; const s = it.r * (.3 + .7 * Math.sqrt(k));
+      this.mesh.setMatrixAt(i, _m.compose(it.pos, _q.identity(), _s.set(s, s, s)));
+      this.mesh.setColorAt(i, _c.copy(it.col).multiplyScalar(Math.pow(1 - k, 1.5) * .8));
+    });
+    this.active = a; this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+const bursts = new Bursts(64);
+class Pillars { // ⑦ 光柱
+  constructor(n) {
+    this.n = n; this.mesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.25, 1, 14, 1, true), new THREE.MeshBasicMaterial({ blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, side: THREE.DoubleSide }), n);
+    this.mesh.frustumCulled = false;
+    for (let i = 0; i < n; i++) { this.mesh.setMatrixAt(i, ZERO); this.mesh.setColorAt(i, _c.set(0)); }
+    this.items = Array.from({ length: n }, () => ({ alive: false, t: 0, dur: 1, r: 1, h: 1, pos: new THREE.Vector3(), col: new THREE.Color() }));
+    this.cursor = 0; this.active = 0; scene.add(this.mesh);
+  }
+  spawn(pos, r, h, col, dur = .35) { const it = this.items[this.cursor]; this.cursor = (this.cursor + 1) % this.n; Object.assign(it, { alive: true, t: 0, dur, r, h }); it.pos.copy(pos); it.col.copy(col); }
+  update(dt) {
+    let a = 0;
+    this.items.forEach((it, i) => {
+      if (!it.alive) return; it.t += dt; const k = it.t / it.dur;
+      if (k >= 1) { it.alive = false; this.mesh.setMatrixAt(i, ZERO); return; }
+      a++; const r = it.r * (1 - k * .6);
+      this.mesh.setMatrixAt(i, _m.compose(_v.set(it.pos.x, it.h / 2, it.pos.z), _q.identity(), _s.set(r, it.h, r)));
+      this.mesh.setColorAt(i, _c.copy(it.col).multiplyScalar(Math.pow(1 - k, 2) * .38));
+    });
+    this.active = a; this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+const pillars = new Pillars(14);
+class Bolts { // ③ ribbon 閃電／光束
+  constructor(maxBolts = 96, segs = 14) {
+    this.N = maxBolts; this.S = segs; const V = maxBolts * segs * 4;
+    this.pos = new Float32Array(V * 3); this.other = new Float32Array(V * 3); this.side = new Float32Array(V);
+    this.width = new Float32Array(V); this.alpha = new Float32Array(V); this.col = new Float32Array(V * 3);
+    const idx = new Uint32Array(maxBolts * segs * 6);
+    for (let q = 0, v = 0, k = 0; q < maxBolts * segs; q++, v += 4) {
+      this.side[v] = -1; this.side[v + 1] = 1; this.side[v + 2] = -1; this.side[v + 3] = 1;
+      idx[k++] = v; idx[k++] = v + 2; idx[k++] = v + 1; idx[k++] = v + 1; idx[k++] = v + 2; idx[k++] = v + 3;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('aOther', new THREE.BufferAttribute(this.other, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('aSide', new THREE.BufferAttribute(this.side, 1));
+    g.setAttribute('aWidth', new THREE.BufferAttribute(this.width, 1).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('aAlpha', new THREE.BufferAttribute(this.alpha, 1).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('aColor', new THREE.BufferAttribute(this.col, 3).setUsage(THREE.DynamicDrawUsage));
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 500);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uToon: TOON }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      vertexShader: `attribute vec3 aOther; attribute float aSide; attribute float aWidth; attribute float aAlpha; attribute vec3 aColor;
+        varying float vSide; varying float vAlpha; varying vec3 vCol;
+        void main(){ vec4 p=modelViewMatrix*vec4(position,1.0); vec4 o=modelViewMatrix*vec4(aOther,1.0);
+          vec2 d=o.xy-p.xy; d=length(d)>1e-5?normalize(d):vec2(1.0,0.0); vec2 n=vec2(-d.y,d.x);
+          float w=min(aWidth, -p.z*0.028); p.xy+=n*aSide*w; vSide=aSide; vAlpha=aAlpha; vCol=aColor; gl_Position=projectionMatrix*p; }`,
+      fragmentShader: `uniform float uToon; varying float vSide; varying float vAlpha; varying vec3 vCol;
+        void main(){ float t=1.0-abs(vSide); float a=pow(t,2.0)*vAlpha; if(uToon>0.5) a=floor(a*3.0+0.5)/3.0; gl_FragColor=vec4(vCol*(1.0+t*1.6),a); }`,
+    });
+    this.mesh = new THREE.Mesh(g, mat); this.mesh.frustumCulled = false; scene.add(this.mesh);
+    this.bolts = []; this.active = 0;
+  }
+  gen(a, b, amp, pts) {
+    const S = this.S; const dir = new THREE.Vector3().subVectors(b, a); const len = dir.length(); dir.normalize();
+    const up = Math.abs(dir.y) > .9 ? new THREE.Vector3(1, 0, 0) : UP;
+    const t1 = new THREE.Vector3().crossVectors(dir, up).normalize(), t2 = new THREE.Vector3().crossVectors(dir, t1);
+    for (let i = 0; i <= S; i++) {
+      const t = i / S, k = Math.sin(t * Math.PI) * amp * len;
+      pts[i].copy(a).lerp(b, t).addScaledVector(t1, rnd(k, -k)).addScaledVector(t2, rnd(k, -k));
+    }
+  }
+  fire(a, b, col, dur = .22, width = .1, amp = .1) {
+    const pts = Array.from({ length: this.S + 1 }, () => new THREE.Vector3());
+    a = a.clone(); b = b.clone(); this.gen(a, b, amp, pts);
+    const base = { a, b, pts, t: 0, dur, amp, rejit: 0 };
+    this.bolts.push({ ...base, width: width * 2.8, alpha: .34, col: col.clone() });
+    this.bolts.push({ ...base, pts, width, alpha: 1, col: col.clone().lerp(WHITE, .6) });
+  }
+  update(dt) {
+    const S = this.S; let bi = 0;
+    for (let n = this.bolts.length - 1; n >= 0; n--) {
+      const bl = this.bolts[n]; bl.t += dt;
+      if (bl.t >= bl.dur) { this.bolts.splice(n, 1); continue; }
+      bl.rejit -= dt; if (bl.rejit <= 0 && bl.amp > 0) { bl.rejit = .045; this.gen(bl.a, bl.b, bl.amp, bl.pts); }
+    }
+    for (const bl of this.bolts) {
+      if (bi >= this.N) break;
+      const fade = Math.pow(1 - bl.t / bl.dur, 1.4) * bl.alpha;
+      for (let s = 0; s < S; s++) {
+        const p = bl.pts[s], q = bl.pts[s + 1], v = (bi * S + s) * 4;
+        for (let j = 0; j < 4; j++) {
+          const src = j < 2 ? p : q, oth = j < 2 ? q : p, o3 = (v + j) * 3;
+          this.pos[o3] = src.x; this.pos[o3 + 1] = src.y; this.pos[o3 + 2] = src.z;
+          this.other[o3] = oth.x; this.other[o3 + 1] = oth.y; this.other[o3 + 2] = oth.z;
+          this.col[o3] = bl.col.r; this.col[o3 + 1] = bl.col.g; this.col[o3 + 2] = bl.col.b;
+          this.width[v + j] = bl.width; this.alpha[v + j] = fade;
+        }
+      }
+      bi++;
+    }
+    this.active = bi;
+    const g = this.mesh.geometry; g.setDrawRange(0, bi * S * 6);
+    for (const k of ['position', 'aOther', 'aWidth', 'aAlpha', 'aColor']) g.attributes[k].needsUpdate = true;
+  }
+}
+const bolts = new Bolts(96, 14);
+class Numbers { // ⑧ 傷害數字
+  constructor(n) {
+    this.items = [];
+    for (let i = 0; i < n; i++) {
+      const cv = document.createElement('canvas'); cv.width = 160; cv.height = 80;
+      const tex = new THREE.CanvasTexture(cv); tex.minFilter = THREE.LinearFilter;
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }));
+      sp.visible = false; sp.renderOrder = 10; scene.add(sp);
+      this.items.push({ sp, cv, tex, alive: false, t: 0, vel: new THREE.Vector3(), crit: false, small: false });
+    }
+    this.cursor = 0; this.active = 0;
+  }
+  spawn(pos, text, crit = false, col = '#ffffff', small = false) {
+    if (!W.numbers) return;
+    const it = this.items[this.cursor]; this.cursor = (this.cursor + 1) % this.items.length;
+    const ctx = it.cv.getContext('2d'); ctx.clearRect(0, 0, 160, 80);
+    ctx.font = `${crit ? 900 : 700} ${crit ? 54 : 40}px "Arial Black",Arial,sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(10,8,4,.9)'; ctx.strokeText(text, 80, 42); ctx.fillStyle = crit ? '#ffd14a' : col; ctx.fillText(text, 80, 42);
+    it.tex.needsUpdate = true; it.alive = true; it.t = 0; it.crit = crit; it.small = small;
+    it.sp.position.copy(pos).add(_v.set(rnd(.3, -.3), .5, rnd(.3, -.3))); it.vel.set(rnd(.8, -.8), small ? 2 : 3.2, rnd(.8, -.8)); it.sp.visible = true;
+  }
+  update(dt) {
+    let a = 0;
+    for (const it of this.items) {
+      if (!it.alive) continue; it.t += dt; const dur = it.crit ? .9 : .65;
+      if (it.t >= dur) { it.alive = false; it.sp.visible = false; continue; }
+      a++; it.vel.y -= 7 * dt; it.sp.position.addScaledVector(it.vel, dt);
+      const k = it.t / dur, pop = 1 + Math.sin(Math.min(k * 6, Math.PI)) * .45;
+      const s = (it.crit ? .8 : it.small ? .36 : .55) * pop; it.sp.scale.set(s * 2, s, 1); it.sp.material.opacity = 1 - Math.pow(k, 3);
+    }
+    this.active = a;
+  }
+}
+const numbers = new Numbers(56);
+const sparks = new Particles(3000); // ⑤
+const _hv = new THREE.Vector3(), _d = new THREE.Vector3();
+function hitFX(pos, dir, col, scale = 1, col2 = null) {
+  bursts.spawn(pos, .35 * scale, col, .16);
+  const n = Math.round(5 * scale);
+  for (let i = 0; i < n; i++) {
+    _hv.set(rnd(1, -1), rnd(1, .2), rnd(1, -1)).normalize().multiplyScalar(rnd(6, 2)).addScaledVector(dir, 3);
+    sparks.spawn(pos, _hv, i % 3 === 0 ? C('core') : (col2 && i % 2 ? col2 : col), rnd(.9, .4), rnd(.4, .2), { grav: 12, drag: .96 });
+  }
+}
+const hex = c => '#' + c.getHexString();
+
+// ───────────────────────── 怪物 ─────────────────────────
+const TYPES = {
+  grunt: { hp: 4, size: .55, speed: 2.6, col: 0x5d6b78 },
+  swarm: { hp: 2, size: .36, speed: 3.6, col: 0x6e8a5a },
+  brute: { hp: 12, size: .92, speed: 1.7, col: 0x7a5a8a },
+  boss:  { hp: 12 * BOSS.hpMul, size: BOSS.size, speed: BOSS.speed, col: 0x8a5ac8 }, // 只由 summonBoss() 生成
+};
+class Enemies {
+  constructor(n) {
+    this.n = n;
+    this.mesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshLambertMaterial(), n);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.mesh.frustumCulled = false;
+    for (let i = 0; i < n; i++) { this.mesh.setMatrixAt(i, ZERO); this.mesh.setColorAt(i, _c.set(0)); }
+    this.e = Array.from({ length: n }, () => ({ alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), base: new THREE.Color(), sq: new THREE.Vector3(1, 1, 1), hitDir: new THREE.Vector3(), cd: new Map(), deathCol: new THREE.Color() }));
+    this.alive = 0; this.kills = 0; this.killLog = []; scene.add(this.mesh);
+  }
+  spawn(type, at = null) {
+    const i = this.e.findIndex(e => !e.alive); if (i < 0) return null;
+    const T = TYPES[type], e = this.e[i], ang = rnd(TAU), r = rnd(19, 14);
+    Object.assign(e, { alive: true, dying: false, type, hp: T.hp, maxhp: T.hp, size: T.size * rnd(1.12, .9), speed: T.speed * rnd(1.15, .85),
+      flash: 0, freeze: 0, spin: rnd(TAU), wob: rnd(TAU), dieT: 0, chainDepth: 0,
+      slow: 0, slowT: 0, chill: 0, frozen: 0, root: 0, lift: 0, burnT: 0, burnDps: 0, poisonT: 0, poisonN: 0, cond: 0, mark: 0,
+      fireBoom: false, firePool: false, poisonPool: false, poisonCloud: false, holyJudge: false, slip: 0, dizzy: 0, statusTick: rnd(.12), dotAcc: 0, dotT: 0, boss: false });
+    e.base.set(T.col); e.sq.set(1, 1, 1); e.cd.clear(); e.vel.set(0, 0, 0);
+    if (at) e.pos.copy(at); else e.pos.set(player.pos.x + Math.cos(ang) * r, 0, player.pos.z + Math.sin(ang) * r);
+    return e;
+  }
+  spawnRandom() { const r = Math.random(); return this.spawn(r < .55 ? 'grunt' : r < .9 ? 'swarm' : 'brute'); }
+  *live() { for (let i = 0; i < this.n; i++) { const e = this.e[i]; if (e.alive && !e.dying) yield e; } }
+  nearest(from, maxD, exclude = null) {
+    let best = null, bd = maxD * maxD;
+    for (const e of this.live()) { if (exclude && exclude.has(e)) continue; const d = e.pos.distanceToSquared(from); if (d < bd) { bd = d; best = e; } }
+    return best;
+  }
+  within(pos, r) { const out = []; for (const e of this.live()) if (e.pos.distanceTo(pos) < r + e.size * .5) out.push(e); return out; }
+  densest(list, r = 3) { let best = null, bn = -1; for (const e of list) { let n = 0; for (const f of list) if (f.pos.distanceToSquared(e.pos) < r * r) n++; if (n > bn) { bn = n; best = e; } } return best; }
+  // 所有傷害的唯一入口：數值 → 打擊感 → 元素
+  hit(e, dmg, dir, col, opts = {}) {
+    if (!e.alive || e.dying) return;
+    const wasFrozen = e.frozen > 0;
+    const crit = Math.random() < .12; if (crit) dmg *= 1.5;
+    e.hp -= dmg; e.flash = 1; e.hitDir.copy(dir);
+    if (!e.boss) { // Boss 不吃 hitstop／擊退／頂飛（位置由 Boss AI 決定），其餘（數字、特效、元素）完全一樣
+      e.freeze = Math.max(e.freeze, W.hitstop / 1000);
+      e.vel.addScaledVector(dir, (opts.knock ?? W.knock) * (e.type === 'brute' ? .35 : 1) * (wasFrozen ? .2 : 1));
+      if (opts.lift) e.lift = Math.max(e.lift, opts.lift);
+    } else bossOnHit(e);
+    numbers.spawn(_v2.copy(e.pos).setY(e.size * 1.6 + e.lift), String(Math.round(dmg * 10)), crit, opts.small ? hex(col) : '#ffffff', !!opts.small);
+    hitFX(_v2.copy(e.pos).setY(e.size * .9 + e.lift).addScaledVector(dir, -e.size * .6), dir, col, opts.fxScale ?? 1, EL.s !== 'none' ? S('main') : null);
+    if (!opts.noElem) applyElements(e, _v2.clone(), dir, opts.depth ?? 0, wasFrozen);
+    if (e.hp <= 0 && !e.dying) { e.dying = true; e.dieT = 0; e.deathCol.copy(col); e.chainDepth = opts.depth ?? 0; }
+  }
+  pop(e) {
+    const c = _v2.copy(e.pos).setY(e.size * .8);
+    const shardCol = e.frozen > 0 ? PALE_ICE : e.base;
+    for (let i = 0; i < 10; i++) { _v.set(rnd(1, -1), rnd(1.2, .3), rnd(1, -1)).normalize().multiplyScalar(rnd(7, 3)); sparks.spawn(c, _v, shardCol, rnd(2.2, 1) * e.size * 1.6, rnd(1.1, .6), { grav: 14, drag: .985 }); }
+    for (let i = 0; i < 6; i++) { _v.set(rnd(1, -1), rnd(1.5, .8), rnd(1, -1)).normalize().multiplyScalar(rnd(5, 3)); sparks.spawn(c, _v, GOLD, 1.1, 2.5, { grav: 9, drag: .985, target: player.pos, delay: rnd(.45, .25) }); }
+    bursts.spawn(c, e.size * 1.6, e.deathCol, .2); ringAt(e.pos, e.size * 2.2, e.deathCol, .35, .18);
+    if (W.killBoom) killQueue.push({ pos: e.pos.clone(), t: .08, depth: e.chainDepth + 1 });
+    onDeathElements(e);
+    e.alive = false; this.kills++; this.killLog.push(performance.now());
+  }
+  update(dt) {
+    let alive = 0; const live = [...this.live()];
+    for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++) {
+      const a = live[i], b = live[j]; _v.subVectors(b.pos, a.pos); const d = _v.length(), m = (a.size + b.size) * .9;
+      if (d < m && d > 1e-4) { _v.multiplyScalar(((m - d) / d) * .5); if (a.boss) b.pos.addScaledVector(_v, 2); else if (b.boss) a.pos.addScaledVector(_v, -2); else { a.pos.sub(_v); b.pos.add(_v); } }
+    }
+    for (let i = 0; i < this.n; i++) {
+      const e = this.e[i]; if (!e.alive) continue; alive++;
+      if (e.boss) { this.mesh.setMatrixAt(i, ZERO); updateBoss(e, dt); continue; } // Boss 用 GLB 自己畫
+      if (e.dying) {
+        e.dieT += dt; const k = clamp(e.dieT / .09, 0, 1);
+        e.sq.set(1 + k * .7, 1 - k * .85, 1 + k * .7);
+        if (k >= 1) { this.pop(e); this.mesh.setMatrixAt(i, ZERO); continue; }
+      } else {
+        updateStatus(e, dt);
+        if (e.hp <= 0) { e.dying = true; e.dieT = 0; e.deathCol.copy(statusColor(e)); e.chainDepth = 0; }
+        const stuck = e.frozen > 0 || e.root > 0;
+        if (e.freeze > 0) e.freeze -= dt;
+        else if (!stuck) {
+          e.wob += dt * 6;
+          _v.subVectors(player.pos, e.pos); _v.y = 0; const d = _v.length(); _v.normalize();
+          _v.applyAxisAngle(UP, Math.sin(e.wob * .5 + e.spin) * .35);
+          const want = _v.multiplyScalar(e.speed * (1 - e.slow));
+          e.vel.lerp(want, 1 - Math.pow(.02, dt)); e.pos.addScaledVector(e.vel, dt);
+          if (d < 1.15 + e.size) { _v.subVectors(e.pos, player.pos).setY(0).normalize(); e.pos.copy(player.pos).addScaledVector(_v, 1.15 + e.size); e.vel.addScaledVector(_v, 3); }
+          e.spin += dt * e.speed * 1.4;
+        } else { e.vel.multiplyScalar(.85); e.pos.addScaledVector(e.vel, dt); }
+        e.flash = Math.max(0, e.flash - dt * 7);
+        const f = e.flash; e.sq.set(1 + f * .35, 1 - f * .3, 1 + f * .35);
+        if (e.frozen > 0) e.sq.multiplyScalar(1.22);
+        if (e.slip > 0) { e.slip -= dt; e.sq.set(1.6, .3, 1.6); e.spin += 15 * dt; }
+        e.lift = Math.max(0, e.lift - dt * 3.5);
+      }
+      const bounce = (e.dying || e.frozen > 0 || e.root > 0) ? 0 : Math.abs(Math.sin(e.wob)) * e.size * .18;
+      const s = e.size; _s.set(s * e.sq.x, s * e.sq.y, s * e.sq.z);
+      _q.setFromEuler(new THREE.Euler(e.spin * .6, e.spin, 0));
+      this.mesh.setMatrixAt(i, _m.compose(_v.set(e.pos.x, s * e.sq.y + bounce + e.lift, e.pos.z), _q, _s));
+      this.mesh.setColorAt(i, tintOf(e));
+    }
+    this.alive = alive; this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+const enemies = new Enemies(170);
+const killQueue = []; let bestChain = 0;
+function updateKillQueue(dt) {
+  for (let i = killQueue.length - 1; i >= 0; i--) {
+    const k = killQueue[i]; k.t -= dt; if (k.t > 0) continue; killQueue.splice(i, 1);
+    const col = C('main'); ringAt(k.pos, 1.7, col, .4, .15); bursts.spawn(_v2.copy(k.pos).setY(.5), 1.2, col, .22);
+    bestChain = Math.max(bestChain, k.depth);
+    for (const e of enemies.within(k.pos, 1.7)) { _v.subVectors(e.pos, k.pos).setY(0).normalize(); enemies.hit(e, 1.5, _v, col, { knock: 5, fxScale: .6, depth: k.depth, noElem: true }); }
+  }
+}
+
+// ───────────────────────── 元素三階：狀態、命中、死亡 ─────────────────────────
+const burn = (e, t, dps) => { e.burnT = Math.max(e.burnT, t); e.burnDps = Math.max(e.burnDps, dps); };
+const addPoison = e => { e.poisonN = Math.min(e.poisonN + 1, 6); e.poisonT = 4; };
+const addChill = e => { e.chill = Math.min(e.chill + 1, 4); e.slow = Math.min(.3 + .12 * e.chill, .8); e.slowT = 2.5; };
+function freeze(e, t) {
+  e.frozen = e.boss ? t * .5 : t; // Boss 只凍一半時間 e.chill = 0; e.vel.set(0, 0, 0);
+  bursts.spawn(_v2.copy(e.pos).setY(e.size), e.size * 2, PALE_ICE, .25);
+  for (let i = 0; i < 8; i++) sparks.spawn(_v2, _v.set(rnd(1, -1), rnd(1, .3), rnd(1, -1)).multiplyScalar(2.5), PALE_ICE, .7, .5, { grav: 4 });
+}
+function shatter(e, pos, dir, depth) {
+  const col = EC('ice');
+  enemies.hit(e, e.boss ? 8 : Math.max(e.maxhp * .6, 3), dir, PALE_ICE, { noElem: true, knock: 2, fxScale: 1.6, depth });
+  ringAt(e.pos, 1.9, col, .4, .16); bursts.spawn(pos, 1.3, PALE_ICE, .25);
+  for (let i = 0; i < 14; i++) sparks.spawn(pos, _v.set(rnd(1, -1), rnd(1.5, .4), rnd(1, -1)).multiplyScalar(rnd(7, 3)), PALE_ICE, rnd(1.6, .8), .9, { grav: 12 });
+  for (const n of enemies.within(e.pos, 1.9)) if (n !== e) { addChill(n); _hv.subVectors(n.pos, e.pos).setY(0).normalize(); enemies.hit(n, .8, _hv, col, { noElem: true, knock: 3, fxScale: .5, depth: depth + 1 }); }
+}
+function arcs(e, jumps, dmg, depth) {
+  const col = EC('volt'); let from = e, d = dmg; const used = new Set([e]);
+  if (hasCompound('ice+volt')) jumps += 2;
+  for (let j = 0; j < jumps; j++) {
+    const t = enemies.nearest(from.pos, 3.6, used); if (!t) break; used.add(t);
+    bolts.fire(_v.copy(from.pos).setY(from.size * .9 + from.lift), _v2.copy(t.pos).setY(t.size * .9 + t.lift), col, .18, .05, .14);
+    const dir = new THREE.Vector3().subVectors(t.pos, from.pos).setY(0).normalize(), tgt = t, dd = d;
+    after(.04 * (j + 1), () => { enemies.hit(tgt, dd, dir, col, { noElem: true, knock: 2, fxScale: .6, depth: depth + 1, small: true }); if (hasCompound('toxic+volt')) addPoison(tgt); });
+    const cold = hasCompound('ice+volt') && (t.chill > 0 || t.frozen > 0); if (!cold) d *= .75; from = t;
+  }
+}
+function smite(e, pos, tier, depth) {
+  const col = EC('holy');
+  pillars.spawn(e.pos, .18, 2.4, col, .18); ringAt(e.pos, .7, col, .25, .2);
+  enemies.hit(e, .3 * tier, UP, col, { noElem: true, knock: 0, fxScale: .4, depth: depth + 1, small: true });
+}
+function applyOne(e, el, tier, pos, dir, depth, wasFrozen) {
+  if (tier <= 0 || depth > 3) return;
+  switch (el) {
+    case 'fire': burn(e, 3, .5 * tier); if (tier >= 2) e.fireBoom = true; if (tier >= 3) e.firePool = true; break;
+    case 'ice':
+      if (tier >= 3 && wasFrozen) { shatter(e, pos, dir, depth); break; }
+      addChill(e); if (tier >= 2 && e.chill >= 3 && e.frozen <= 0) freeze(e, 1.6); break;
+    case 'volt': arcs(e, tier >= 2 ? 3 : 1, .7, depth); if (tier >= 3 && e.cond <= 0) { e.cond = 2; pools.push({ type: 'static', pos: e.pos.clone(), r: 2.2, t: 0, dur: 2, tick: 0, vis: discAt(e.pos, 2.2, EC('volt', 'dark'), 2) }); } break;
+    case 'toxic': addPoison(e); if (tier >= 2) e.poisonPool = true; if (tier >= 3) e.poisonCloud = true; break;
+    case 'holy':
+      smite(e, pos, tier, depth); if (tier >= 2) e.holyJudge = true;
+      if (tier >= 3) { e.mark++; if (e.mark >= 3) { e.mark = 0; judgment(e, depth); } }
+      break;
+  }
+}
+function judgment(e, depth) {
+  const col = EC('holy'), c = _v2.copy(e.pos).setY(1.0);
+  for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + rnd(.2); bolts.fire(c, _v.set(c.x + Math.cos(a) * 2.4, 1.0, c.z + Math.sin(a) * 2.4), col, .3, .09, .01); }
+  pillars.spawn(e.pos, .6, 6, col, .4); ringAt(e.pos, 2.4, col, .45, .12); bursts.spawn(c, 1.4, EC('holy', 'core'), .25); flashScreen(.08);
+  for (const n of enemies.within(e.pos, 2.4)) { _hv.subVectors(n.pos, e.pos).setY(0).normalize(); enemies.hit(n, 3, _hv, col, { noElem: true, knock: 6, fxScale: .9, depth: depth + 1 }); }
+}
+function applyElements(e, pos, dir, depth, wasFrozen) {
+  applyOne(e, EL.p, EL.pT, pos, dir, depth, wasFrozen);
+  if (EL.s !== 'none') applyOne(e, EL.s, EL.sT, pos, dir, depth, wasFrozen);
+  // 聖光＋X＝X 擴散：光柱把另一個元素的 I 階傳給周圍
+  if (hasEl('holy') && EL.s !== 'none' && depth < 2) { const other = EL.p === 'holy' ? EL.s : EL.p; for (const n of enemies.within(e.pos, 1.3)) if (n !== e) applyOne(n, other, 1, n.pos, dir, depth + 2, false); }
+  // 蒸氣熱震：同一隻又燒又凍
+  if (hasCompound('fire+ice') && e.burnT > 0 && (e.chill > 0 || e.frozen > 0) && depth < 2) {
+    e.burnT = 0; e.chill = 0; bursts.spawn(_v2.copy(e.pos).setY(e.size), 1.4, WHITE, .3); ringAt(e.pos, 1.8, PALE_ICE, .4, .1);
+    for (let i = 0; i < 12; i++) sparks.spawn(_v2, _v.set(rnd(1, -1), rnd(2, .5), rnd(1, -1)).multiplyScalar(1.5), WHITE, 1.2, .9, { grav: -2, drag: .95 });
+    enemies.hit(e, 1.5, UP, WHITE, { noElem: true, knock: 0, fxScale: .7, depth: depth + 2 });
+    for (const n of enemies.within(e.pos, 1.8)) { n.slow = Math.max(n.slow, .5); n.slowT = Math.max(n.slowT, 1.5); }
+  }
+}
+function onDeathElements(e) {
+  if (e.fireBoom) { const col = EC('fire'); ringAt(e.pos, 1.6, col, .35, .14); bursts.spawn(_v2.copy(e.pos).setY(.5), 1.1, col, .22); for (const n of enemies.within(e.pos, 1.6)) { burn(n, 3, 1); _hv.subVectors(n.pos, e.pos).setY(0).normalize(); enemies.hit(n, .8, _hv, col, { noElem: true, knock: 4, fxScale: .5, depth: 1 }); } }
+  if (e.firePool) pools.push({ type: 'fire', pos: e.pos.clone(), r: 1.4, t: 0, dur: 3, tick: 0, vis: discAt(e.pos, 1.4, EC('fire', 'dark'), 3) });
+  if (e.poisonPool) { pools.push({ type: 'toxic', pos: e.pos.clone(), r: 1.3, t: 0, dur: 3, tick: 0, vis: discAt(e.pos, 1.3, EC('toxic', 'dark'), 3) }); if (e.poisonCloud && clouds.length < 6) clouds.push({ pos: e.pos.clone().setY(.8), t: 0, dur: 5, tick: 0, puff: 0 }); }
+  if (e.holyJudge) { const col = EC('holy'); pillars.spawn(e.pos, .5, 5, col, .35); ringAt(e.pos, 1.4, col, .35, .14); for (const n of enemies.within(e.pos, 1.4)) { _hv.subVectors(n.pos, e.pos).setY(0).normalize(); enemies.hit(n, 1.2, _hv, col, { noElem: true, knock: 5, fxScale: .6, depth: 1 }); } }
+}
+function updateStatus(e, dt) {
+  let dmg = 0; e.statusTick -= dt; const tick = e.statusTick <= 0; if (tick) e.statusTick = .11;
+  const top = _v2.set(e.pos.x + rnd(.3, -.3), e.size * rnd(1.4, .6) + e.lift, e.pos.z + rnd(.3, -.3));
+  if (e.burnT > 0) { e.burnT -= dt; dmg += e.burnDps * dt; if (tick) sparks.spawn(top, _v.set(rnd(.4, -.4), rnd(2.6, 1.4), rnd(.4, -.4)), Math.random() < .3 ? EC('fire', 'core') : EC('fire'), .7, .5, { grav: -3, drag: .97 }); }
+  else e.burnDps = 0;
+  if (e.poisonT > 0) { e.poisonT -= dt; dmg += .35 * e.poisonN * dt; if (tick) sparks.spawn(top, _v.set(rnd(.3, -.3), rnd(1.2, .6), rnd(.3, -.3)), EC('toxic'), .5, .8, { grav: -1, drag: .99 }); }
+  else e.poisonN = 0;
+  if (e.chill > 0) { e.slowT -= dt; if (e.slowT <= 0) { e.chill = 0; e.slow = 0; } if (tick && Math.random() < .5) sparks.spawn(top, _v.set(0, .2, 0), EC('ice', 'core'), .35, .35, { grav: 0, drag: .9 }); }
+  else if (e.slowT > 0) { e.slowT -= dt; if (e.slowT <= 0) e.slow = 0; }
+  if (e.frozen > 0) { e.frozen -= dt; if (e.frozen <= 0) e.slow = 0; }
+  if (e.root > 0) e.root -= dt;
+  if (e.dizzy > 0) { e.dizzy -= dt; e.spin += 10 * dt; if (tick) sparks.spawn(_v2.set(e.pos.x + Math.cos(e.spin * 3) * .5, e.size * 2.1, e.pos.z + Math.sin(e.spin * 3) * .5), _v.set(0, .3, 0), GOLD, .4, .3, { grav: 0, drag: .9 }); }
+  if (e.cond > 0) e.cond -= dt;
+  if (dmg > 0) { e.hp -= dmg; e.dotAcc += dmg; e.dotT += dt; if (e.dotT > .55) { numbers.spawn(_v.copy(e.pos).setY(e.size * 1.5), String(Math.max(1, Math.round(e.dotAcc * 10))), false, hex(statusColor(e)), true); e.dotAcc = 0; e.dotT = 0; } }
+}
+function statusColor(e) { return e.burnT > 0 ? EC('fire') : e.poisonT > 0 ? EC('toxic') : e.frozen > 0 || e.chill > 0 ? EC('ice') : e.cond > 0 ? EC('volt') : C('main'); }
+function tintOf(e) {
+  _c.copy(e.base);
+  if (e.burnT > 0) _c.lerp(EC('fire'), .35); if (e.poisonT > 0) _c.lerp(EC('toxic'), .35); if (e.chill > 0) _c.lerp(EC('ice'), .3);
+  if (e.cond > 0) _c.lerp(EC('volt'), .3); if (e.mark > 0) _c.lerp(EC('holy'), .15 * e.mark); if (e.frozen > 0) _c.copy(PALE_ICE);
+  if (e.flash > 0) _c.lerp(WHITE, .25 + e.flash * .75);
+  return _c;
+}
+// 地面池（火海／毒池／靜電場／蜘蛛網）與毒雲
+const pools = [], clouds = [];
+function updatePools(dt) {
+  for (let i = pools.length - 1; i >= 0; i--) {
+    const p = pools[i]; p.t += dt; p.tick -= dt;
+    if (p.t >= p.dur) { pools.splice(i, 1); continue; }
+    if (p.tick > 0) continue;
+    const inside = enemies.within(p.pos, p.r);
+    if (p.type === 'fire') { p.tick = .3; const col = EC('fire'); for (let k = 0; k < 3; k++) sparks.spawn(_v2.set(p.pos.x + rnd(p.r, -p.r), .1, p.pos.z + rnd(p.r, -p.r)), _v.set(0, rnd(2.5, 1), 0), k ? col : EC('fire', 'core'), .8, .6, { grav: -2, drag: .97 }); for (const e of inside) { burn(e, 1.5, 1.2); enemies.hit(e, .3, UP, col, { noElem: true, knock: 0, fxScale: .3, small: true }); } }
+    else if (p.type === 'toxic') {
+      p.tick = .5; const col = EC('toxic'); for (let k = 0; k < 2; k++) sparks.spawn(_v2.set(p.pos.x + rnd(p.r, -p.r), .1, p.pos.z + rnd(p.r, -p.r)), _v.set(0, rnd(1.2, .5), 0), col, .6, .9, { grav: -.6, drag: .99 });
+      for (const e of inside) addPoison(e);
+      if (hasCompound('fire+toxic') && inside.some(e => e.burnT > 0)) { // 毒氣爆
+        const c = EC('toxic').lerp(EC('fire'), .5); ringAt(p.pos, p.r * 2, c, .45, .12); bursts.spawn(_v2.copy(p.pos).setY(.6), p.r * 1.5, c, .3); crackAt(p.pos, p.r * 1.6, c, 1.2);
+        for (let k = 0; k < 24; k++) sparks.spawn(_v2.copy(p.pos).setY(.2), _v.set(rnd(1, -1), rnd(1.5, .5), rnd(1, -1)).multiplyScalar(rnd(8, 3)), k % 2 ? EC('toxic') : EC('fire'), 1, .7, { grav: 10 });
+        for (const e of enemies.within(p.pos, p.r * 2)) { _hv.subVectors(e.pos, p.pos).setY(0).normalize(); enemies.hit(e, 3, _hv, c, { noElem: true, knock: 8, fxScale: .9 }); }
+        discs.kill(p.vis); pools.splice(i, 1); flashScreen(.08); continue;
+      }
+    }
+    else if (p.type === 'static') { p.tick = .35; const col = EC('volt'); if (inside.length) { const t = inside[Math.floor(Math.random() * inside.length)]; bolts.fire(_v.copy(p.pos).setY(.1), _v2.copy(t.pos).setY(t.size * .9), col, .15, .045, .18); enemies.hit(t, .5, UP, col, { noElem: true, knock: 1, fxScale: .4, small: true }); if (hasCompound('toxic+volt')) addPoison(t); } }
+    else if (p.type === 'slow') { p.tick = .15; p.pulse = (p.pulse ?? 0) + 1; if (p.pulse % 4 === 0) ringAt(p.pos, p.r, PALE_ICE, .8, .04); for (let k = 0; k < 2; k++) sparks.spawn(_v2.set(p.pos.x + rnd(p.r, -p.r), rnd(1.5, .1), p.pos.z + rnd(p.r, -p.r)), _v.set(0, .25, 0), PALE_ICE, .3, 1.2, { grav: 0, drag: 1 }); for (const e of inside) { e.slow = Math.max(e.slow, .85); e.slowT = Math.max(e.slowT, .3); } }
+    else if (p.type === 'web') { p.tick = .2; for (const e of inside) { e.root = Math.max(e.root, .5); if (hasEl('ice')) addChill(e); if (hasEl('toxic') && Math.random() < .3) addPoison(e); } }
+  }
+  for (let i = clouds.length - 1; i >= 0; i--) {
+    const c = clouds[i]; c.t += dt; c.tick -= dt; c.puff -= dt;
+    if (c.t >= c.dur) { clouds.splice(i, 1); continue; }
+    const t = enemies.nearest(c.pos, 12); if (t) { _v.subVectors(t.pos, c.pos).setY(0).normalize(); c.pos.addScaledVector(_v, 1.7 * dt); }
+    if (c.puff <= 0) { c.puff = .09; bursts.spawn(_v2.set(c.pos.x + rnd(.5, -.5), .8 + rnd(.5, -.3), c.pos.z + rnd(.5, -.5)), .7, EC('toxic', 'dark'), .5); }
+    if (c.tick <= 0) { c.tick = .5; for (const e of enemies.within(c.pos, 1.2)) addPoison(e); }
+  }
+}
+
+// ───────────────────────── 投射物池（④ 拖尾） ─────────────────────────
+class Bullets {
+  constructor(n) {
+    this.n = n; this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(.09, .09, .7), new THREE.MeshBasicMaterial({ blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }), n);
+    this.mesh.frustumCulled = false;
+    for (let i = 0; i < n; i++) { this.mesh.setMatrixAt(i, ZERO); this.mesh.setColorAt(i, _c.set(0)); }
+    this.b = Array.from({ length: n }, () => ({ alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), life: 0, col: new THREE.Color() }));
+    this.cursor = 0; this.active = 0; scene.add(this.mesh);
+  }
+  fire(pos, dir, o = {}) {
+    const b = this.b[this.cursor]; this.cursor = (this.cursor + 1) % this.n;
+    b.alive = true; b.pos.copy(pos); b.vel.copy(dir).multiplyScalar(o.speed ?? 30); b.life = o.life ?? .7; b.dmg = o.dmg ?? 1; b.scale = o.scale ?? 1; b.knock = o.knock ?? W.knock; b.col.copy(o.col ?? C('main')); b.trail = o.trail ?? false; b.chill = !!o.chill;
+  }
+  update(dt) {
+    let a = 0; const core = C('core');
+    this.b.forEach((b, i) => {
+      if (!b.alive) return; b.life -= dt; b.pos.addScaledVector(b.vel, dt);
+      if (b.trail) sparks.spawn(b.pos, _v.set(rnd(.5, -.5), rnd(.5, -.5), rnd(.5, -.5)), b.col, .5 * b.scale, .3, { grav: 0, drag: .9 });
+      let hit = null; for (const e of enemies.live()) if (e.pos.distanceToSquared(_v.copy(b.pos).setY(0)) < (e.size + .35 * b.scale) ** 2 && b.pos.y < e.size * 2.2 + e.lift) { hit = e; break; }
+      if (hit) { _v.copy(b.vel).normalize(); if (b.chill) addChill(hit); enemies.hit(hit, b.dmg, _v, b.col, { knock: b.knock, fxScale: .8 + b.scale * .3 }); b.alive = false; }
+      if (b.life <= 0 || !b.alive) { b.alive = false; this.mesh.setMatrixAt(i, ZERO); return; }
+      a++; _m.lookAt(b.pos, _v.copy(b.pos).add(b.vel), UP); _q.setFromRotationMatrix(_m);
+      this.mesh.setMatrixAt(i, _m.compose(b.pos, _q, _s.set(b.scale, b.scale, b.scale * (1 + b.vel.length() * .02))));
+      this.mesh.setColorAt(i, _c.copy(core).lerp(b.col, .4).multiplyScalar(1.1));
+    });
+    this.active = a; this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+const bullets = new Bullets(220);
+
+// ───────────────────────── V1：無人機／鐵鎚／連鎖／落雷／砸地 ─────────────────────────
+let gunCd = 0; const droneWorld = new THREE.Vector3(), droneAim = new THREE.Vector3();
+function updateDrone(dt, t) {
+  player.drone.visible = W.drone;
+  player.drone.position.copy(player.droneBase).add(_v.set(0, Math.sin(t * 3) * .05, 0));
+  player.drone.getWorldPosition(droneWorld);
+  const tgt = enemies.nearest(droneWorld, 13);
+  if (tgt) { droneAim.copy(tgt.pos).setY(tgt.size * .9 + tgt.lift); player.drone.lookAt(droneAim); } else player.drone.rotation.set(0, player.yaw, 0);
+  gunCd -= dt;
+  if (W.drone && tgt && gunCd <= 0) {
+    gunCd = .1; _v.subVectors(droneAim, droneWorld).normalize();
+    bullets.fire(_v2.copy(droneWorld).addScaledVector(_v, .35), _v);
+    for (let i = 0; i < 2; i++) sparks.spawn(_v2, _s.copy(_v).multiplyScalar(rnd(6, 3)).add(_hv.set(rnd(1, -1), rnd(1, -1), rnd(1, -1))), C('core'), .6, .12, { grav: 0, drag: .9 });
+  }
+}
+function mergeGeos(list) {
+  const pos = [], nor = [];
+  list.forEach(({ geo, m }) => { const g = geo.toNonIndexed(); g.applyMatrix4(m); pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array); });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); return g;
+}
+const hammerGeo = mergeGeos([{ geo: new THREE.BoxGeometry(.5, .28, .28), m: new THREE.Matrix4().makeTranslation(0, .3, 0) }, { geo: new THREE.CylinderGeometry(.05, .06, .75, 8), m: new THREE.Matrix4().makeTranslation(0, -.08, 0) }]);
+const goldMat = new THREE.MeshStandardMaterial({ color: 0xffc94d, metalness: .75, roughness: .3, emissive: 0x7a5410 });
+const hammers = new THREE.InstancedMesh(hammerGeo, goldMat, 8); hammers.frustumCulled = false; scene.add(hammers);
+const hammerPos = Array.from({ length: 8 }, () => new THREE.Vector3()); let hammerTrail = 0;
+function updateHammers(dt, t) {
+  hammerTrail -= dt;
+  for (let i = 0; i < 8; i++) {
+    if (i >= W.hammers) { hammers.setMatrixAt(i, ZERO); continue; }
+    const ph = i / W.hammers; let r, ang;
+    if (W.hammerMode === 'spiral') { const cyc = (t * .55 + ph) % 1; r = .9 + cyc * 4.2; ang = t * 4.2 + ph * TAU + cyc * 3.0; } else { r = 2.3; ang = t * 3.0 + ph * TAU; }
+    hammerPos[i].set(player.pos.x + Math.cos(ang) * r, 1.05 + Math.sin(t * 5 + i) * .12, player.pos.z + Math.sin(ang) * r);
+    _q.setFromEuler(new THREE.Euler(t * 9 + i, ang, .6)); hammers.setMatrixAt(i, _m.compose(hammerPos[i], _q, _s.set(1, 1, 1)));
+    if (hammerTrail <= 0) sparks.spawn(hammerPos[i], _v.set(rnd(.5, -.5), rnd(.8, .2), rnd(.5, -.5)), GOLD, .55, .3, { grav: 2, drag: .95 });
+    for (const e of enemies.live()) if (e.pos.distanceToSquared(_v.copy(hammerPos[i]).setY(0)) < (e.size + .55) ** 2) {
+      const last = e.cd.get('h' + i) ?? -9; if (t - last < .4) continue; e.cd.set('h' + i, t);
+      _v.subVectors(e.pos, player.pos).setY(0).normalize(); enemies.hit(e, 2, _v, GOLD, { knock: 7, fxScale: 1.2 });
+    }
+  }
+  if (hammerTrail <= 0) hammerTrail = .03;
+  hammers.instanceMatrix.needsUpdate = true;
+}
+let chainCd = .6; const handWorld = new THREE.Vector3();
+function updateChain(dt) {
+  chainCd -= dt; player.hL.getWorldPosition(handWorld); if (!W.chain || chainCd > 0) return;
+  let from = handWorld.clone(), cur = enemies.nearest(from, 9); if (!cur) return;
+  chainCd = .85; const col = C('main'), used = new Set(); let dmg = 2;
+  for (let j = 0; j < W.chainJumps && cur; j++) {
+    used.add(cur); const to = cur.pos.clone().setY(cur.size * .9);
+    bolts.fire(from, to, col, .26, .09, .13);
+    const tgt = cur, d = new THREE.Vector3().subVectors(to, from).normalize(), dd = dmg;
+    after(j * .055, () => { enemies.hit(tgt, dd, d, col, { knock: 4, fxScale: .9 }); ringAt(tgt.pos, .9, col, .3, .2); });
+    dmg *= .85; from = to; cur = enemies.nearest(to, 4.5, used);
+  }
+  player.glow.scale.setScalar(1.8);
+}
+let skyCd = 1; const telegraphs = [];
+function skyStrike(pos, big) {
+  const col = C('main'), top = new THREE.Vector3(pos.x + rnd(1.2, -1.2), 10.5, pos.z + rnd(1.2, -1.2)), g = new THREE.Vector3(pos.x, 0, pos.z);
+  bolts.fire(top, g, col, big ? .34 : .22, big ? .17 : .09, big ? .12 : .09);
+  if (big) bolts.fire(top.clone().lerp(g, .55).add(new THREE.Vector3(rnd(2, -2), 0, rnd(2, -2))), g.clone().add(new THREE.Vector3(rnd(3, -3), 0, rnd(3, -3))), col, .2, .06, .2);
+  pillars.spawn(g, big ? .7 : .22, big ? 7 : 5, col, big ? .4 : .22);
+  ringAt(g, big ? 3.2 : 1.1, col, big ? .55 : .35, big ? .1 : .18); crackAt(g, big ? 2.6 : 1.1, col, big ? 2 : 1.2); bursts.spawn(_v2.copy(g).setY(.3), big ? 1.6 : .7, col, .2);
+  for (let i = 0; i < (big ? 26 : 8); i++) { _s.set(rnd(1, -1), rnd(1.5, .5), rnd(1, -1)).normalize().multiplyScalar(rnd(big ? 9 : 5, 2)); sparks.spawn(_v2.copy(g).setY(.1), _s, i % 2 ? C('core') : col, rnd(1, .5), rnd(.7, .3), { grav: 11 }); }
+  const R = big ? 3.1 : 1.0, dmg = big ? 3 : (W.sky === 'fast' ? 2 : 1.5);
+  for (const e of enemies.within(g, R)) { _s.subVectors(e.pos, g).setY(0).normalize(); enemies.hit(e, dmg, _s, col, { knock: big ? 9 : 3, fxScale: big ? 1.3 : .8 }); }
+  if (big) flashScreen(.18);
+}
+function updateSky(dt) {
+  for (let i = telegraphs.length - 1; i >= 0; i--) { const tg = telegraphs[i]; tg.t -= dt; if (tg.t <= 0) { telegraphs.splice(i, 1); skyStrike(tg.pos, tg.big); } }
+  skyCd -= dt; if (W.sky === 'off' || skyCd > 0) return;
+  const live = [...enemies.live()]; if (!live.length) return;
+  const pick = () => live[Math.floor(Math.random() * live.length)].pos.clone();
+  const tele = (pos, big, delay) => { ringAt(pos, big ? 3.0 : 1.0, C('dark'), delay, .06); telegraphs.push({ pos, big, t: delay }); };
+  if (W.sky === 'fast') { skyCd = .45; tele(pick(), false, .25); }
+  else if (W.sky === 'multi') { skyCd = 1.7; for (let i = 0; i < 5; i++) tele(pick(), false, .35 + i * .09); }
+  else { skyCd = 2.6; tele(enemies.densest(live).pos.clone(), true, .5); }
+}
+function slam() {
+  if (player.slamCd > 0) return; player.slamCd = 1.2; player.slamAnim = 1;
+  const col = C('main'), p = player.pos;
+  ringAt(p, 5.6, col, .5, .09); ringAt(p, 2.4, C('core'), .3, .16); crackAt(p, 3.6, col, 2.2); pillars.spawn(p, .6, 4, col, .25);
+  for (let i = 0; i < 40; i++) { const a = rnd(TAU); _v.set(Math.cos(a), rnd(.9, .3), Math.sin(a)).multiplyScalar(rnd(9, 4)); sparks.spawn(_v2.set(p.x, .1, p.z), _v, i % 3 ? GOLD : C('core'), rnd(1, .5), rnd(.7, .35), { grav: 12 }); }
+  for (const e of enemies.within(p, 5.6)) { const d = e.pos.distanceTo(p); _v.subVectors(e.pos, p).setY(0).normalize(); enemies.hit(e, 2, _v, col, { knock: 10 * (1 - d / 7), fxScale: .9, lift: .6 }); }
+  flashScreen(.1);
+}
+function flashScreen(a) { const f = $('#flash'); f.style.transition = 'none'; f.style.opacity = a; requestAnimationFrame(() => { f.style.transition = 'opacity .18s'; f.style.opacity = 0; }); }
+function toast(html) { const t = $('#toast'); t.innerHTML = html; t.style.opacity = 1; clearTimeout(t._h); t._h = setTimeout(() => t.style.opacity = 0, 1400); }
+
+// ───────────────────────── 武器庫 V2／V3 ─────────────────────────
+const aimPoint = (maxD = 14) => { const t = enemies.nearest(player.pos, maxD); return t ? t.pos.clone() : player.pos.clone().addScaledVector(fwd(), 5); };
+const aimDir = (maxD = 14) => { const t = enemies.nearest(player.pos, maxD); return t ? new THREE.Vector3().subVectors(t.pos, player.pos).setY(0).normalize() : fwd(); };
+const handPos = (side = 1) => { const p = side > 0 ? player.hR : player.hL; return p.getWorldPosition(new THREE.Vector3()).add(_v.set(0, .25, 0)); };
+// 施放起點：這把武器有裝在身上槽位且有模型 → 從槍口出；否則照舊從手出
+const muzzle = (id, side = 1) => muzzleOf(id) ?? handPos(side);
+// 從高處槍口往目標打的 3D 方向（平面 aimDir 會從頭頂飛過小怪）
+const aimDir3 = (from, maxD = 14) => { const t = enemies.nearest(player.pos, maxD); return t ? new THREE.Vector3(t.pos.x, t.size * .9 + t.lift, t.pos.z).sub(from).normalize() : fwd(); };
+
+// 投射：霰彈／追蹤飛彈／炸彈／毒霧彈
+function castShotgun() {
+  const dir = aimDir(9), from = muzzleOf('shotgun') ?? handPos(1).addScaledVector(dir, .4), col = C('main'), dir3 = aimDir3(from, 9);
+  bursts.spawn(from, .6, C('core'), .14); ringAt(player.pos.clone().addScaledVector(dir, .8), .9, col, .25, .2);
+  for (let i = 0; i < 7; i++) { _v.copy(dir3).applyAxisAngle(UP, rnd(.3, -.3)); _v.y += rnd(.08, -.04); _v.normalize(); bullets.fire(from, _v, { speed: 34, life: .26, dmg: .9, scale: .75, knock: 9, col }); }
+  for (let i = 0; i < 10; i++) sparks.spawn(from, _s.copy(dir).multiplyScalar(rnd(12, 5)).add(_hv.set(rnd(2, -2), rnd(2, -2), rnd(2, -2))), C('core'), .6, .2, { grav: 0, drag: .88 });
+}
+class Missiles {
+  constructor(n) {
+    this.n = n; const g = new THREE.ConeGeometry(.09, .42, 6); g.rotateX(Math.PI / 2);
+    this.mesh = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }), n); this.mesh.frustumCulled = false;
+    for (let i = 0; i < n; i++) { this.mesh.setMatrixAt(i, ZERO); this.mesh.setColorAt(i, _c.set(0)); }
+    this.m = Array.from({ length: n }, () => ({ alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), t: 0, target: null })); this.cursor = 0; this.active = 0; scene.add(this.mesh);
+  }
+  launch(pos, vel, target) { const m = this.m[this.cursor]; this.cursor = (this.cursor + 1) % this.n; m.alive = true; m.pos.copy(pos); m.vel.copy(vel); m.t = 0; m.target = target; }
+  update(dt) {
+    let a = 0; const col = C('main'), col2 = S('main');
+    this.m.forEach((m, i) => {
+      if (!m.alive) return; m.t += dt;
+      if (m.t > .25) { // 先散開再追：轉向強度隨時間變大＝有「緩衝」的追蹤感
+        if (!m.target || !m.target.alive || m.target.dying) m.target = enemies.nearest(m.pos, 14);
+        if (m.target) { _v.copy(m.target.pos).setY(m.target.size * .8 + m.target.lift).sub(m.pos).normalize().multiplyScalar(14); m.vel.lerp(_v, 1 - Math.pow(.004, dt * Math.min(1, (m.t - .25) * 2))); }
+      }
+      m.pos.addScaledVector(m.vel, dt);
+      sparks.spawn(m.pos, _v.set(rnd(.4, -.4), rnd(.4, -.4), rnd(.4, -.4)), a % 2 ? col : col2, .42, .38, { grav: 0, drag: .86 });
+      if (m.target && m.target.alive && m.pos.distanceTo(_v.copy(m.target.pos).setY(m.target.size * .8 + m.target.lift)) < .65) { _v.copy(m.vel).normalize(); enemies.hit(m.target, 1.6, _v, col, { knock: 4, fxScale: 1.1 }); bursts.spawn(m.pos, .7, col, .2); m.alive = false; }
+      if (m.t > 4 || m.pos.y < 0) m.alive = false;
+      if (!m.alive) { this.mesh.setMatrixAt(i, ZERO); return; }
+      a++; _m.lookAt(m.pos, _v.copy(m.pos).add(m.vel), UP); _q.setFromRotationMatrix(_m);
+      this.mesh.setMatrixAt(i, _m.compose(m.pos, _q, _s.set(1, 1, 1))); this.mesh.setColorAt(i, _c.copy(C('core')).lerp(col, .3).multiplyScalar(1.2));
+    });
+    this.active = a; this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+const missiles = new Missiles(48);
+function castMissiles() {
+  const from = muzzle('missiles'), t0 = enemies.nearest(player.pos, 14), live = [...enemies.live()];
+  for (let i = 0; i < 5; i++) {
+    const a = (i - 2) * .45, dir = fwd().applyAxisAngle(UP, a); dir.y = 1.1; dir.normalize();
+    const target = live.length ? live[Math.floor(Math.random() * live.length)] : t0;
+    missiles.launch(from, dir.multiplyScalar(9), target);
+  }
+  bursts.spawn(from, .5, C('core'), .15);
+}
+class Bombs {
+  constructor(n) {
+    this.n = n; this.mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(.22, 10, 8), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .5, metalness: .4 }), n); this.mesh.frustumCulled = false;
+    for (let i = 0; i < n; i++) { this.mesh.setMatrixAt(i, ZERO); this.mesh.setColorAt(i, _c.set(0x2a2b33)); }
+    this.b = Array.from({ length: n }, () => ({ alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), t: 0, gas: false, landed: false })); this.cursor = 0; scene.add(this.mesh);
+  }
+  throwAt(from, target, gas) {
+    const b = this.b[this.cursor]; this.cursor = (this.cursor + 1) % this.n;
+    b.alive = true; b.gas = gas; b.landed = false; b.t = 0; b.pos.copy(from);
+    const d = _v.subVectors(target, from); const fl = .9; b.vel.set(d.x / fl, 14 * fl * .5 - from.y / fl, d.z / fl);
+  }
+  explode(b) {
+    const g = b.pos.clone().setY(0);
+    if (b.gas) { const col = EC('toxic'); pools.push({ type: 'toxic', pos: g.clone(), r: 2.3, t: 0, dur: 5, tick: 0, vis: discAt(g, 2.3, EC('toxic', 'dark'), 5) }); ringAt(g, 2.4, col, .5, .1); for (let k = 0; k < 14; k++) bursts.spawn(_v2.set(g.x + rnd(1.6, -1.6), rnd(1.2, .3), g.z + rnd(1.6, -1.6)), .9, EC('toxic', 'dark'), rnd(.9, .5)); for (const e of enemies.within(g, 2.3)) { addPoison(e); addPoison(e); } }
+    else { const col = C('main'); ringAt(g, 2.8, col, .5, .11); bursts.spawn(_v2.copy(g).setY(.6), 1.8, col, .25); crackAt(g, 2.2, col, 1.6); pillars.spawn(g, .5, 3.5, col, .25); flashScreen(.1);
+      for (let k = 0; k < 30; k++) sparks.spawn(_v2.copy(g).setY(.2), _v.set(rnd(1, -1), rnd(1.5, .4), rnd(1, -1)).normalize().multiplyScalar(rnd(10, 4)), k % 3 ? col : C('core'), rnd(1.1, .5), rnd(.8, .4), { grav: 12 });
+      for (const e of enemies.within(g, 2.8)) { const d = e.pos.distanceTo(g); _hv.subVectors(e.pos, g).setY(0).normalize(); enemies.hit(e, 3.5, _hv, col, { knock: 10 * (1 - d / 4), fxScale: 1.1, lift: .8 }); } }
+    b.alive = false;
+  }
+  update(dt) {
+    this.b.forEach((b, i) => {
+      if (!b.alive) return; b.t += dt; b.vel.y -= 14 * dt; b.pos.addScaledVector(b.vel, dt);
+      if (b.pos.y < .22) { b.pos.y = .22; b.vel.y *= -.45; b.vel.x *= .6; b.vel.z *= .6; b.landed = true; sparks.spawn(b.pos, _v.set(0, 1, 0), WHITE, .3, .2, { grav: 0 }); }
+      if ((b.gas && b.landed) || (!b.gas && b.t > 1.1)) this.explode(b);
+      if (!b.alive) { this.mesh.setMatrixAt(i, ZERO); return; }
+      const blink = !b.gas && Math.sin(b.t * 30) > 0; this.mesh.setColorAt(i, _c.set(blink ? 0xff5030 : (b.gas ? 0x3f6b2a : 0x2a2b33)));
+      this.mesh.setMatrixAt(i, _m.compose(b.pos, _q.setFromEuler(new THREE.Euler(b.t * 6, b.t * 4, 0)), _s.set(1, 1, 1)));
+    });
+    this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+const bombs = new Bombs(16);
+const castBomb = () => bombs.throwAt(muzzle('bomb', 1), aimPoint(10), false);
+const castGas = () => bombs.throwAt(muzzle('gas', -1), aimPoint(10), true);
+
+// 近身：爪擊／旋風衝鋒／迴旋鐮刀／天降大拳頭
+function castClaw() {
+  const dir = aimDir(5), right = new THREE.Vector3().crossVectors(dir, UP).normalize(), col = C('main');
+  for (let k = -1; k <= 1; k++) {
+    const kk = k; after((k + 1) * .035, () => {
+      const a = player.pos.clone().addScaledVector(dir, 1.1).addScaledVector(right, -1.7).setY(1.15 + kk * .3), b = player.pos.clone().addScaledVector(dir, 2.7).addScaledVector(right, 1.7).setY(.75 + kk * .3);
+      bolts.fire(a, b, col, .22, .075, .012); for (let i = 0; i < 5; i++) sparks.spawn(a.clone().lerp(b, rnd()), _v.copy(right).multiplyScalar(rnd(4, 1)).add(_hv.set(0, rnd(2, -1), 0)), C('core'), .5, .3, { grav: 6 });
+    });
+  }
+  for (const e of enemies.live()) { _v.subVectors(e.pos, player.pos).setY(0); const d = _v.length(); if (d < 3.6 && _v.normalize().dot(dir) > .45) { const side = Math.sign(_v.dot(right)) || 1; after(.06, () => enemies.hit(e, 2.2, right.clone().multiplyScalar(side).add(dir).normalize(), col, { knock: 8, fxScale: 1.3 })); } }
+}
+const bladeGeo = new THREE.BoxGeometry(.95, .05, .26);
+const blades = new THREE.InstancedMesh(bladeGeo, goldMat, 6); blades.frustumCulled = false; scene.add(blades);
+function castWhirl() { if (player.whirl) return; player.whirl = { t: 0, dur: .95, dir: aimDir(12), tick: 0, ring: 0 }; }
+function updateWhirl(dt) {
+  const w = player.whirl;
+  if (!w) { for (let i = 0; i < 6; i++) blades.setMatrixAt(i, ZERO); blades.instanceMatrix.needsUpdate = true; return; }
+  w.t += dt; w.tick -= dt; w.ring -= dt;
+  const k = w.t / w.dur, spd = 9 * Math.sin(Math.min(1, k * 1.6) * Math.PI * .5 + .3);
+  player.pos.addScaledVector(w.dir, spd * dt); player.yaw = Math.atan2(w.dir.x, w.dir.z);
+  for (let i = 0; i < 6; i++) { const a = w.t * 22 + i * TAU / 6, r = 1.55; blades.setMatrixAt(i, _m.compose(_v.set(player.pos.x + Math.cos(a) * r, .85 + Math.sin(a * 2) * .1, player.pos.z + Math.sin(a) * r), _q.setFromEuler(new THREE.Euler(0, -a, .15)), _s.set(1, 1, 1))); }
+  blades.instanceMatrix.needsUpdate = true;
+  if (w.ring <= 0) { w.ring = .11; ringAt(player.pos, 1.9, GOLD, .35, .14); for (let i = 0; i < 3; i++) sparks.spawn(_v2.set(player.pos.x + rnd(1.5, -1.5), .3, player.pos.z + rnd(1.5, -1.5)), _v.set(0, rnd(2, 1), 0), GOLD, .5, .3, { grav: 3 }); }
+  if (w.tick <= 0) { w.tick = .14; for (const e of enemies.within(player.pos, 2.1)) { _v.subVectors(e.pos, player.pos).setY(0).normalize().applyAxisAngle(UP, .9); enemies.hit(e, 1.3, _v, GOLD, { knock: 9, fxScale: .9, lift: .4 }); } }
+  if (k >= 1) player.whirl = null;
+}
+const scythe = new THREE.Group();
+{ const blade = new THREE.Mesh(new THREE.TorusGeometry(.75, .055, 6, 18, Math.PI * 1.15), goldMat); blade.rotation.x = Math.PI / 2; const handle = new THREE.Mesh(new THREE.CylinderGeometry(.04, .05, 1.5, 8), new THREE.MeshStandardMaterial({ color: 0x3a2d22, roughness: .9 })); handle.rotation.z = Math.PI / 2; handle.position.x = -.4; scythe.add(blade, handle); scythe.visible = false; scene.add(scythe); }
+let scytheState = null;
+function castScythe() { if (scytheState) return; const dir = aimDir(12); scytheState = { t: 0, dur: 1.5, dir, right: new THREE.Vector3().crossVectors(dir, UP).normalize() }; scythe.visible = true; }
+function updateScythe(dt) {
+  const s = scytheState; if (!s) return; s.t += dt; const k = s.t / s.dur;
+  if (k >= 1) { scytheState = null; scythe.visible = false; return; }
+  scythe.position.copy(player.pos).addScaledVector(s.dir, Math.sin(k * Math.PI) * 6.5).addScaledVector(s.right, Math.sin(k * TAU) * 1.8).setY(1.0 + Math.sin(k * Math.PI) * .3);
+  scythe.rotation.y += 15 * dt;
+  sparks.spawn(_v2.copy(scythe.position).add(_v.set(Math.cos(scythe.rotation.y) * .75, 0, -Math.sin(scythe.rotation.y) * .75)), _hv.set(0, .3, 0), C('main'), .45, .3, { grav: 0, drag: .9 });
+  for (const e of enemies.live()) if (e.pos.distanceToSquared(_v.copy(scythe.position).setY(0)) < (e.size + .9) ** 2) { const last = e.cd.get('sc') ?? -9; if (s.t - last < .3) continue; e.cd.set('sc', s.t); _v.copy(s.dir).applyAxisAngle(UP, .6 * (k < .5 ? 1 : -1)); enemies.hit(e, 2.2, _v, C('main'), { knock: 6, fxScale: 1.1 }); }
+}
+const fist = new THREE.Group();
+{ const fur = new THREE.MeshStandardMaterial({ color: 0x3a3c47, roughness: .95 }); const palm = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.0, 1.7), fur); fist.add(palm); for (let i = 0; i < 4; i++) { const f = new THREE.Mesh(new THREE.BoxGeometry(.34, .5, .6), fur); f.position.set(-.55 + i * .37, .55, .55); fist.add(f); } const th = new THREE.Mesh(new THREE.BoxGeometry(.4, .4, .7), fur); th.position.set(.85, -.05, .2); fist.add(th); fist.visible = false; scene.add(fist); }
+let fistState = null;
+function castFist() { if (fistState) return; const live = [...enemies.live()]; const tgt = live.length ? enemies.densest(live, 2.6).pos.clone() : aimPoint(); fistState = { t: 0, target: tgt, hit: false }; fist.visible = true; ringAt(tgt, 2.6, C('dark'), .35, .06); }
+function updateFist(dt) {
+  const f = fistState; if (!f) return; f.t += dt; const tg = f.target;
+  if (f.t < .35) { const k = f.t / .35; fist.position.set(tg.x, 9 - 8.5 * k * k, tg.z); fist.rotation.set(0, f.t * 2, 0); }
+  else if (!f.hit) {
+    f.hit = true; fist.position.y = .5; const col = C('main');
+    ringAt(tg, 3.4, GOLD, .5, .09); ringAt(tg, 1.6, WHITE, .25, .18); crackAt(tg, 2.8, col, 2.2); flashScreen(.14);
+    for (let i = 0; i < 36; i++) { const a = rnd(TAU); sparks.spawn(_v2.set(tg.x, .1, tg.z), _v.set(Math.cos(a), rnd(1, .3), Math.sin(a)).multiplyScalar(rnd(9, 4)), i % 3 ? new THREE.Color(0x6b6e78) : GOLD, rnd(1.2, .6), rnd(.8, .4), { grav: 12 }); }
+    for (const e of enemies.within(tg, 2.8)) { const d = e.pos.distanceTo(tg); _hv.subVectors(e.pos, tg).setY(0).normalize(); enemies.hit(e, 4.5, _hv, col, { knock: d < 1.1 ? 0 : 9, fxScale: 1.3 }); if (d < 1.1) { e.flash = 1; e.sq.set(1.8, .2, 1.8); } }
+    toast('👊 <b>天降大拳頭</b>');
+  }
+  else if (f.t > .8) { const k = clamp((f.t - .8) / .4, 0, 1); fist.position.y = .5 + k * k * 10; if (k >= 1) { fistState = null; fist.visible = false; } }
+}
+
+// 場地：地刺／裂地／陷阱／蜘蛛網
+class Spikes {
+  constructor(n) {
+    this.n = n; const g = new THREE.ConeGeometry(.17, 1, 5); g.translate(0, .5, 0);
+    this.mesh = new THREE.InstancedMesh(g, new THREE.MeshLambertMaterial(), n); this.mesh.frustumCulled = false;
+    for (let i = 0; i < n; i++) { this.mesh.setMatrixAt(i, ZERO); this.mesh.setColorAt(i, _c.set(0x8a8d99)); }
+    this.s = Array.from({ length: n }, () => ({ alive: false, pos: new THREE.Vector3(), t: 0, dur: 1, h: 1, rot: 0 })); this.cursor = 0; scene.add(this.mesh);
+  }
+  spawn(pos, h, dur) { const i = this.cursor; const s = this.s[i]; this.cursor = (this.cursor + 1) % this.n; s.alive = true; s.pos.copy(pos); s.t = 0; s.dur = dur; s.h = h; s.rot = rnd(TAU); this.mesh.setColorAt(i, _c.set(0x8a8d99).lerp(C('dark'), .35)); }
+  update(dt) {
+    this.s.forEach((s, i) => {
+      if (!s.alive) return; s.t += dt; if (s.t >= s.dur) { s.alive = false; this.mesh.setMatrixAt(i, ZERO); return; }
+      const rise = Math.min(1, s.t / .12) * (1 - clamp((s.t - (s.dur - .35)) / .35, 0, 1));
+      this.mesh.setMatrixAt(i, _m.compose(_v.set(s.pos.x, -.05, s.pos.z), _q.setFromEuler(new THREE.Euler(rnd(.08, -.08), s.rot, rnd(.08, -.08))), _s.set(1, s.h * rise + .001, 1)));
+    });
+    this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+const spikes = new Spikes(220);
+const fields = []; // 地刺區：{pos, r, t, dur, tick}
+function spikeField(pos, r, dur, count, dmg = 1) {
+  for (let i = 0; i < count; i++) { const a = rnd(TAU), d = Math.sqrt(rnd()) * r; spikes.spawn(_v2.set(pos.x + Math.cos(a) * d, 0, pos.z + Math.sin(a) * d), rnd(1.6, .9), dur); }
+  crackAt(pos, r * 1.2, C('main'), dur); ringAt(pos, r * 1.3, C('main'), .3, .16);
+  for (let i = 0; i < 10; i++) sparks.spawn(_v2.set(pos.x + rnd(r, -r), .1, pos.z + rnd(r, -r)), _v.set(0, rnd(4, 2), 0), new THREE.Color(0x6b6e78), .8, .5, { grav: 10 });
+  if (dmg > 0) fields.push({ pos: pos.clone(), r, t: 0, dur, tick: 0, dmg });
+}
+function updateFields(dt) {
+  for (let i = fields.length - 1; i >= 0; i--) {
+    const f = fields[i]; f.t += dt; f.tick -= dt; if (f.t >= f.dur - .3) { fields.splice(i, 1); continue; }
+    if (f.tick > 0) continue; f.tick = .4;
+    for (const e of enemies.within(f.pos, f.r)) { _hv.subVectors(e.pos, f.pos).setY(0).normalize(); enemies.hit(e, f.dmg, _hv, C('main'), { knock: 1.5, fxScale: .6, lift: .9 }); }
+  }
+}
+const castSpikes = () => spikeField(aimPoint(), 1.7, 3.5, 14);
+function castFissure() {
+  const dir = aimDir(14), col = C('main');
+  for (let i = 1; i <= 10; i++) { const p = player.pos.clone().addScaledVector(dir, .9 + i * 1.05).add(_v.set(rnd(.3, -.3), 0, rnd(.3, -.3))); after(i * .055, () => { crackAt(p, 1.1, col, 2.2); bursts.spawn(_v2.copy(p).setY(.3), .6, col, .2); for (let k = 0; k < 3; k++) spikes.spawn(_v2.set(p.x + rnd(.5, -.5), 0, p.z + rnd(.5, -.5)), rnd(1.5, .8), 1.8); for (const e of enemies.within(p, 1.2)) { _hv.subVectors(e.pos, p).setY(0).normalize(); enemies.hit(e, 2.2, _hv, col, { knock: 5, fxScale: .9, lift: 1.1 }); } }); }
+  ringAt(player.pos, 1.5, col, .3, .16);
+}
+const traps = [];
+function castTrap() {
+  const p = player.pos.clone().addScaledVector(aimDir(10), 3.2); const vis = webAt(p, 1.0, C('dark'), 14);
+  traps.push({ pos: p, r: .95, t: 0, vis, pulse: 0 }); toast('🪤 陷阱已放，等怪踩');
+}
+function updateTraps(dt) {
+  for (let i = traps.length - 1; i >= 0; i--) {
+    const tr = traps[i]; tr.t += dt; tr.pulse -= dt;
+    if (tr.t > 14) { traps.splice(i, 1); continue; }
+    if (tr.pulse <= 0) { tr.pulse = 1; ringAt(tr.pos, 1.0, C('dark'), .8, .05); }
+    if (enemies.within(tr.pos, tr.r).length) {
+      webs.kill(tr.vis); traps.splice(i, 1); const col = C('main');
+      ringAt(tr.pos, 2.4, col, .4, .12); bursts.spawn(_v2.copy(tr.pos).setY(.5), 1.4, col, .25); spikeField(tr.pos, 1.5, 1.6, 9, 0);
+      for (const e of enemies.within(tr.pos, 2.4)) { _hv.subVectors(e.pos, tr.pos).setY(0).normalize(); enemies.hit(e, 3.2, _hv, col, { knock: 7, fxScale: 1.1, lift: 1.0 }); }
+    }
+  }
+}
+function castWeb() {
+  const live = [...enemies.live()]; const p = live.length ? enemies.densest(live, 2.2).pos.clone() : aimPoint();
+  const col = hasEl('ice') ? PALE_ICE : new THREE.Color(0xe8e8f0);
+  pools.push({ type: 'web', pos: p, r: 2.1, t: 0, dur: 4, tick: 0, vis: webAt(p, 2.1, col, 4) });
+  ringAt(p, 2.2, col, .35, .12); for (let i = 0; i < 12; i++) sparks.spawn(_v2.set(p.x + rnd(2, -2), .2, p.z + rnd(2, -2)), _v.set(0, rnd(1.5, .5), 0), col, .4, .5, { grav: 2 });
+}
+
+// 召喚：三頭火龍／哨塔／龍捲風／小幫手
+const summons = [];
+function castHydra() {
+  const pos = player.pos.clone().addScaledVector(aimDir(10), 2.6), g = new THREE.Group(); g.position.copy(pos);
+  const stone = new THREE.MeshStandardMaterial({ color: 0x4a4d58, roughness: .9 }), skin = new THREE.MeshStandardMaterial({ color: C('dark'), roughness: .6, emissive: C('dark'), emissiveIntensity: .35 });
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(.5, .7, .5, 8), stone); base.position.y = .25; g.add(base);
+  const heads = [];
+  for (let i = 0; i < 3; i++) {
+    const a = i * TAU / 3, h = new THREE.Group(); h.position.set(Math.cos(a) * .45, 1.25, Math.sin(a) * .45);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(.09, .14, .9, 8), skin); neck.position.y = -.4; h.add(neck);
+    const skull = new THREE.Mesh(new THREE.SphereGeometry(.26, 10, 8), skin); h.add(skull);
+    const snout = new THREE.Mesh(new THREE.ConeGeometry(.16, .45, 8), skin); snout.rotation.x = Math.PI / 2; snout.position.z = .35; h.add(snout);
+    g.add(h); heads.push({ g: h, cd: .4 + i * .18, a });
+  }
+  scene.add(g); summons.push({ type: 'hydra', g, pos, t: 0, dur: 9, heads });
+  ringAt(pos, 1.6, C('main'), .4, .14); pillars.spawn(pos, .5, 3, C('main'), .3); crackAt(pos, 1.4, C('main'), 2);
+}
+function castTurret() {
+  const pos = player.pos.clone().addScaledVector(aimDir(10).applyAxisAngle(UP, rnd(.8, -.8)), 2.2), g = new THREE.Group(); g.position.copy(pos);
+  const post = new THREE.Mesh(new THREE.CylinderGeometry(.22, .35, 1.3, 8), new THREE.MeshStandardMaterial({ color: 0x4a4d58, roughness: .9 })); post.position.y = .65; g.add(post);
+  const top = new THREE.Mesh(new THREE.OctahedronGeometry(.3, 0), goldMat); top.position.y = 1.65; g.add(top);
+  scene.add(g); summons.push({ type: 'turret', g, pos, t: 0, dur: 11, cd: .3, top });
+  ringAt(pos, 1.2, GOLD, .35, .16);
+}
+function castTornado() { const pos = aimPoint(); summons.push({ type: 'tornado', pos: pos.clone(), t: 0, dur: 7, tick: 0, ring: 0, spin: 0 }); ringAt(pos, 2.4, C('main'), .5, .08); }
+let wisp = null;
+function ensureWisp(on) {
+  if (on && !wisp) { const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8), new THREE.MeshBasicMaterial({ color: C('core') }))); const halo = new THREE.Mesh(new THREE.SphereGeometry(.38, 10, 8), new THREE.MeshBasicMaterial({ color: C('main'), transparent: true, opacity: .4, blending: THREE.AdditiveBlending, depthWrite: false })); g.add(halo); scene.add(g); wisp = { g, halo, pos: player.pos.clone().add(new THREE.Vector3(0, 1.8, -1.5)), cd: 0, t: 0 }; }
+  if (!on && wisp) { scene.remove(wisp.g); wisp = null; }
+}
+function updateSummons(dt, t) {
+  for (let i = summons.length - 1; i >= 0; i--) {
+    const s = summons[i]; s.t += dt;
+    if (s.t >= s.dur) { if (s.g) { bursts.spawn(_v2.copy(s.pos).setY(1), 1.4, C('main'), .3); scene.remove(s.g); } summons.splice(i, 1); continue; }
+    if (s.type === 'hydra') {
+      for (const h of s.heads) {
+        h.cd -= dt; const hp = h.g.getWorldPosition(new THREE.Vector3()); const tgt = enemies.nearest(hp, 11);
+        if (tgt) { _v.copy(tgt.pos).setY(tgt.size * .8 + tgt.lift); h.g.lookAt(_v); } else h.g.rotation.set(Math.sin(t * 2 + h.a) * .2, h.a + Math.PI / 2, 0);
+        h.g.position.y = 1.25 + Math.sin(t * 3 + h.a) * .06;
+        if (tgt && h.cd <= 0) { h.cd = .55; _v.copy(tgt.pos).setY(tgt.size * .8).sub(hp).normalize(); bullets.fire(_v2.copy(hp).addScaledVector(_v, .5), _v, { speed: 16, life: 1, dmg: 1.6, scale: 1.7, knock: 5, trail: true }); bursts.spawn(_v2, .4, C('core'), .14); }
+      }
+    } else if (s.type === 'turret') {
+      s.cd -= dt; s.top.rotation.y += dt * 3; const tgt = enemies.nearest(s.pos, 7.5);
+      if (tgt && s.cd <= 0) { s.cd = .32; const from = _v.copy(s.pos).setY(1.65); bolts.fire(from, _v2.copy(tgt.pos).setY(tgt.size * .9), GOLD, .12, .045, .03); enemies.hit(tgt, 1, new THREE.Vector3().subVectors(tgt.pos, s.pos).setY(0).normalize(), GOLD, { knock: 1.5, fxScale: .6 }); }
+    } else if (s.type === 'storm') {
+      s.cd -= dt; s.flash = Math.max(0, s.flash - dt * 6); s.mat.emissiveIntensity = .4 + s.flash * 3;
+      s.g.position.lerp(_v.set(player.pos.x, 4.6 + Math.sin(t * 1.3) * .15, player.pos.z), 1 - Math.pow(.05, dt)); s.g.rotation.y += dt * .3; s.pos.copy(player.pos);
+      if (Math.random() < dt * 6) sparks.spawn(_v2.copy(s.g.position).add(_v.set(rnd(1.4, -1.4), -.4, rnd(1.4, -1.4))), _hv.set(0, -3, 0), EC('volt', 'dark'), .3, .5, { grav: 2, drag: 1 });
+      const tgt = enemies.nearest(player.pos, 7);
+      if (tgt && s.cd <= 0) { s.cd = .45; s.flash = 1; const from = _v.copy(s.g.position).add(_v2.set(rnd(1, -1), -.3, rnd(1, -1))); bolts.fire(from, _v2.copy(tgt.pos).setY(tgt.size * .9), C('main'), .2, .08, .1); ringAt(tgt.pos, 1.1, C('main'), .3, .18); enemies.hit(tgt, 1.5, UP, C('main'), { knock: 2, fxScale: .8 }); }
+    } else if (s.type === 'tornado') {
+      s.tick -= dt; s.ring -= dt; s.spin += dt * 12;
+      const tgt = enemies.nearest(s.pos, 14); if (tgt) { _v.subVectors(tgt.pos, s.pos).setY(0).normalize(); s.pos.addScaledVector(_v, 1.6 * dt); } else { s.pos.x += Math.sin(t) * dt; s.pos.z += Math.cos(t * .7) * dt; }
+      const col = C('main'), core = C('core');
+      for (let k = 0; k < 5; k++) { const h = rnd(2.8), a = s.spin + k * TAU / 5 + h * 2, r = .35 + h * .5; _v2.set(s.pos.x + Math.cos(a) * r, h + .1, s.pos.z + Math.sin(a) * r); _v.set(-Math.sin(a), .6, Math.cos(a)).multiplyScalar(3.2); sparks.spawn(_v2, _v, k % 2 ? WHITE : (k % 3 ? col : core), .55, .32, { grav: -1.5, drag: .9 }); }
+      if (s.ring <= 0) { s.ring = .22; ringAt(s.pos, 1.7, col, .55, .06); }
+      for (const e of enemies.within(s.pos, 2.3)) { const d = e.pos.distanceTo(s.pos); _v.subVectors(s.pos, e.pos).setY(0).normalize(); e.pos.addScaledVector(_v, 2.6 * dt); e.lift = Math.max(e.lift, 1.5 * (1 - d / 2.3)); e.spin += 8 * dt; }
+      if (s.tick <= 0) { s.tick = .4; for (const e of enemies.within(s.pos, 2.3)) enemies.hit(e, .7, UP, col, { knock: 0, fxScale: .5, small: true }); }
+    }
+  }
+  if (wisp) {
+    wisp.cd -= dt; wisp.t += dt; const tgt = wisp.cd <= 0 ? enemies.nearest(player.pos, 13) : null;
+    if (tgt) { _v.copy(tgt.pos).setY(tgt.size + .3).sub(wisp.pos); const d = _v.length(); wisp.pos.addScaledVector(_v.normalize(), Math.min(d, 8.5 * dt));
+      if (d < .6) { wisp.cd = .75; const col = C('main'); ringAt(tgt.pos, 1.4, col, .3, .16); bursts.spawn(wisp.pos, .9, col, .2); for (const e of enemies.within(tgt.pos, 1.4)) { _hv.subVectors(e.pos, tgt.pos).setY(0).normalize(); enemies.hit(e, 1.6, _hv, col, { knock: 5, fxScale: .9 }); } } }
+    else { _v.set(player.pos.x + Math.cos(wisp.t * 1.5) * 1.6, 1.9 + Math.sin(wisp.t * 3) * .15, player.pos.z + Math.sin(wisp.t * 1.5) * 1.6); wisp.pos.lerp(_v, 1 - Math.pow(.01, dt)); }
+    wisp.g.position.copy(wisp.pos); wisp.halo.scale.setScalar(1 + Math.sin(wisp.t * 8) * .12); wisp.halo.material.color.copy(C('main'));
+    sparks.spawn(wisp.pos, _hv.set(rnd(.3, -.3), rnd(.3, -.3), rnd(.3, -.3)), C('main'), .35, .3, { grav: 0, drag: .9 });
+  }
+}
+
+// ───────────────────────── 武器庫 V3 ─────────────────────────
+const REDHAND = new THREE.Color(0xff3b4a);
+// 迴旋鋸刃：在怪之間彈 6 下，再飛回手上
+const sawGeo = mergeGeos([{ geo: new THREE.CylinderGeometry(.42, .42, .07, 8), m: new THREE.Matrix4() }, { geo: new THREE.CylinderGeometry(.58, .58, .035, 16), m: new THREE.Matrix4() }, { geo: new THREE.CylinderGeometry(.12, .12, .12, 8), m: new THREE.Matrix4() }]);
+const saws = [];
+function castSaw() {
+  if (saws.length >= 3) return;
+  const mesh = new THREE.Mesh(sawGeo, goldMat); scene.add(mesh);
+  saws.push({ mesh, pos: handPos(1), target: enemies.nearest(player.pos, 12), visited: new Set(), hits: 0, t: 0, back: false });
+}
+function updateSaws(dt) {
+  for (let i = saws.length - 1; i >= 0; i--) {
+    const s = saws[i]; s.t += dt;
+    if (!s.back && (!s.target || !s.target.alive || s.target.dying)) s.target = enemies.nearest(s.pos, 7, s.visited);
+    if (!s.back && (!s.target || s.hits >= 6 || s.t > 4)) s.back = true;
+    const goal = s.back ? _v.copy(player.pos).setY(1) : _v.copy(s.target.pos).setY(s.target.size * .8);
+    _v2.subVectors(goal, s.pos); const d = _v2.length(); _d.copy(_v2).normalize(); s.pos.addScaledVector(_d, Math.min(d, 13 * dt));
+    s.mesh.position.copy(s.pos); s.mesh.rotation.y += 25 * dt; s.mesh.rotation.z = .35;
+    sparks.spawn(s.pos, _hv.set(rnd(.5, -.5), rnd(.5, -.5), rnd(.5, -.5)), GOLD, .4, .25, { grav: 0, drag: .9 });
+    if (!s.back && d < .55) { const tgt = s.target; s.visited.add(tgt); s.hits++; enemies.hit(tgt, 2.5, _d, GOLD, { knock: 5, fxScale: 1.2 }); ringAt(tgt.pos, .9, GOLD, .25, .2); s.target = enemies.nearest(s.pos, 7, s.visited); }
+    if (s.back && d < .6) { scene.remove(s.mesh); saws.splice(i, 1); }
+  }
+}
+// 大型手裡劍：穿透一整排，去程回程各切一次
+const shurikenGeo = mergeGeos([0, 1, 2, 3].map(i => ({ geo: new THREE.BoxGeometry(2.3, .06, .34), m: new THREE.Matrix4().makeRotationY(i * Math.PI / 4) })).concat([{ geo: new THREE.CylinderGeometry(.32, .32, .1, 8), m: new THREE.Matrix4() }]));
+const shuriken = new THREE.Mesh(shurikenGeo, new THREE.MeshStandardMaterial({ color: 0x3b3d47, metalness: .8, roughness: .35, emissive: 0x3a2a08 })); shuriken.visible = false; scene.add(shuriken);
+let shurikenState = null;
+function castShuriken() { if (shurikenState) return; shurikenState = { t: 0, dur: 1.9, dir: aimDir(12), hitSet: new Set(), half: false }; shuriken.visible = true; }
+function updateShuriken(dt) {
+  const s = shurikenState; if (!s) return; s.t += dt; const k = s.t / s.dur;
+  if (k >= 1) { shurikenState = null; shuriken.visible = false; return; }
+  if (k > .5 && !s.half) { s.half = true; s.hitSet.clear(); }
+  shuriken.position.copy(player.pos).addScaledVector(s.dir, Math.sin(k * Math.PI) * 9).setY(1.0); shuriken.rotation.y += 18 * dt;
+  for (let i = 0; i < 2; i++) sparks.spawn(_v2.copy(shuriken.position).add(_v.set(rnd(1, -1), 0, rnd(1, -1))), _hv.set(0, .2, 0), C('main'), .4, .25, { grav: 0, drag: .9 });
+  for (const e of enemies.live()) if (!s.hitSet.has(e) && e.pos.distanceToSquared(_v.copy(shuriken.position).setY(0)) < (e.size + 1.1) ** 2) { s.hitSet.add(e); _d.copy(s.dir).applyAxisAngle(UP, (Math.random() < .5 ? 1 : -1) * 1.2).multiplyScalar(k < .5 ? 1 : -1); enemies.hit(e, 3, _d, C('main'), { knock: 8, fxScale: 1.3 }); }
+}
+// 地獄手：5 隻手從地底伸出來抓住拖住，最後一起捏
+const handGeo = mergeGeos([{ geo: new THREE.BoxGeometry(.5, .8, .28), m: new THREE.Matrix4().makeTranslation(0, .4, 0) }].concat([-.17, 0, .17].map(x => ({ geo: new THREE.BoxGeometry(.13, .45, .2), m: new THREE.Matrix4().makeTranslation(x, 1.0, 0) }))).concat([{ geo: new THREE.BoxGeometry(.14, .35, .2), m: new THREE.Matrix4().makeTranslation(.33, .65, 0) }]));
+const hands = new THREE.InstancedMesh(handGeo, new THREE.MeshStandardMaterial({ color: 0x5a1020, roughness: .7, emissive: 0x3a0510 }), 12); hands.frustumCulled = false; scene.add(hands);
+const handItems = Array.from({ length: 12 }, () => ({ alive: false, pos: new THREE.Vector3(), t: 0, dur: 2.2, rot: 0 })); let handCursor = 0;
+const grabs = [];
+function castHands() {
+  const live = [...enemies.live()]; const c = live.length ? enemies.densest(live, 2.4).pos.clone() : aimPoint();
+  for (let i = 0; i < 5; i++) { const a = i * TAU / 5 + rnd(.4), r = rnd(1.9, 1.0); const h = handItems[handCursor]; handCursor = (handCursor + 1) % 12; h.alive = true; h.pos.set(c.x + Math.cos(a) * r, 0, c.z + Math.sin(a) * r); h.t = 0; h.dur = 2.2; h.rot = rnd(TAU); }
+  crackAt(c, 2.6, REDHAND, 2.4); ringAt(c, 2.6, REDHAND, .5, .1);
+  for (let i = 0; i < 16; i++) bursts.spawn(_v2.set(c.x + rnd(2, -2), rnd(.8, .2), c.z + rnd(2, -2)), .8, new THREE.Color(0x3a0a14), rnd(1.2, .6));
+  grabs.push({ pos: c, r: 2.4, t: 0, dur: 2.2, tick: .25 });
+}
+function updateHands(dt) {
+  handItems.forEach((h, i) => {
+    if (!h.alive) return; h.t += dt; if (h.t >= h.dur) { h.alive = false; hands.setMatrixAt(i, ZERO); return; }
+    const rise = Math.min(1, h.t / .25) * (1 - clamp((h.t - (h.dur - .35)) / .35, 0, 1)), grabK = clamp((h.t - .4) / .3, 0, 1);
+    hands.setMatrixAt(i, _m.compose(_v.set(h.pos.x, -1.3 + rise * 1.3, h.pos.z), _q.setFromEuler(new THREE.Euler(grabK * .5, h.rot, Math.sin(h.t * 6) * .1)), _s.set(1, 1, 1)));
+  });
+  hands.instanceMatrix.needsUpdate = true;
+  for (let i = grabs.length - 1; i >= 0; i--) {
+    const g = grabs[i]; g.t += dt; g.tick -= dt;
+    if (g.t >= g.dur) { grabs.splice(i, 1); ringAt(g.pos, 2.6, REDHAND, .4, .14); bursts.spawn(_v2.copy(g.pos).setY(.6), 1.6, REDHAND, .25); for (const e of enemies.within(g.pos, g.r)) { _d.subVectors(e.pos, g.pos).setY(0).normalize(); enemies.hit(e, 3, _d, REDHAND, { knock: 3, fxScale: 1.1 }); } continue; }
+    if (g.tick > 0) continue; g.tick = .4;
+    for (const e of enemies.within(g.pos, g.r)) { e.root = Math.max(e.root, .5); _d.subVectors(g.pos, e.pos).setY(0).normalize(); e.pos.addScaledVector(_d, .25); enemies.hit(e, 1.2, UP, REDHAND, { knock: 0, fxScale: .5, small: true }); e.sq.set(1.2, .7, 1.2); }
+  }
+}
+// 隕石雨：區域範圍攻擊，8 顆依序砸
+class Meteors {
+  constructor(n) {
+    this.n = n; this.mesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(.32, 0), new THREE.MeshStandardMaterial({ color: 0x3a2a24, roughness: .9, emissive: 0xff5a1a, emissiveIntensity: .8 }), n); this.mesh.frustumCulled = false;
+    for (let i = 0; i < n; i++) this.mesh.setMatrixAt(i, ZERO);
+    this.m = Array.from({ length: n }, () => ({ alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), t: 0 })); this.cursor = 0; scene.add(this.mesh);
+  }
+  drop(p) { const m = this.m[this.cursor]; this.cursor = (this.cursor + 1) % this.n; m.alive = true; m.t = 0; m.pos.set(p.x + rnd(3, -3), 11, p.z + rnd(3, -3)); m.vel.subVectors(p, m.pos).normalize().multiplyScalar(24); }
+  update(dt) {
+    this.m.forEach((m, i) => {
+      if (!m.alive) return; m.t += dt; m.pos.addScaledVector(m.vel, dt);
+      for (let k = 0; k < 2; k++) sparks.spawn(m.pos, _hv.set(rnd(1, -1), rnd(1, -1), rnd(1, -1)).sub(m.vel.clone().multiplyScalar(.06)), k ? C('main') : C('core'), .6, .35, { grav: 0, drag: .92 });
+      if (m.pos.y < .3) {
+        m.alive = false; this.mesh.setMatrixAt(i, ZERO); const g = m.pos.clone().setY(0), col = C('main');
+        ringAt(g, 1.8, col, .4, .14); crackAt(g, 1.4, col, 1.6); bursts.spawn(_v2.copy(g).setY(.4), 1.0, col, .22); flashScreen(.04);
+        for (let k = 0; k < 14; k++) sparks.spawn(_v2.copy(g).setY(.2), _v.set(rnd(1, -1), rnd(1.5, .5), rnd(1, -1)).normalize().multiplyScalar(rnd(8, 3)), k % 3 ? col : new THREE.Color(0x6b6e78), rnd(1, .5), rnd(.7, .3), { grav: 12 });
+        for (const e of enemies.within(g, 1.8)) { _d.subVectors(e.pos, g).setY(0).normalize(); enemies.hit(e, 2.5, _d, col, { knock: 6, fxScale: 1, lift: .6 }); }
+        return;
+      }
+      this.mesh.setMatrixAt(i, _m.compose(m.pos, _q.setFromEuler(new THREE.Euler(m.t * 7, m.t * 5, 0)), _s.set(1, 1, 1)));
+    });
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+const meteors = new Meteors(16);
+function castMeteors() {
+  const live = [...enemies.live()]; const c = live.length ? enemies.densest(live, 3.2).pos.clone() : aimPoint();
+  ringAt(c, 3.6, C('dark'), .6, .05);
+  for (let i = 0; i < 8; i++) after(i * .17, () => { const p = c.clone().add(new THREE.Vector3(rnd(3.2, -3.2), 0, rnd(3.2, -3.2))); ringAt(p, 1.5, C('dark'), .38, .06); after(.36, () => meteors.drop(p)); });
+}
+// 大火球／冰封球（D2 法師）
+class Orbs {
+  constructor(n) {
+    this.n = n; this.mesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshBasicMaterial({ blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }), n); this.mesh.frustumCulled = false;
+    for (let i = 0; i < n; i++) { this.mesh.setMatrixAt(i, ZERO); this.mesh.setColorAt(i, _c.set(0)); }
+    this.o = Array.from({ length: n }, () => ({ alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), t: 0, dur: 1, type: 'fire', emit: 0, ang: 0 })); this.cursor = 0; scene.add(this.mesh);
+  }
+  spawn(type) {
+    const o = this.o[this.cursor]; this.cursor = (this.cursor + 1) % this.n; const dir = aimDir(14);
+    o.alive = true; o.type = type; o.t = 0; o.emit = 0; o.ang = rnd(TAU); o.pos.copy(muzzle(type === 'fire' ? 'fireball' : 'frozenorb')).setY(1.1); o.vel.copy(dir).multiplyScalar(type === 'fire' ? 9 : 5.5); o.dur = 1.7;
+    bursts.spawn(o.pos, .6, type === 'fire' ? C('core') : PALE_ICE, .15);
+  }
+  explodeFire(p) {
+    const col = EC('fire'), g = p.clone().setY(0);
+    ringAt(g, 3.2, col, .5, .11); ringAt(g, 1.4, EC('fire', 'core'), .25, .2); bursts.spawn(_v2.copy(g).setY(.8), 2.2, col, .3); crackAt(g, 2.4, col, 1.8); pillars.spawn(g, .6, 4, col, .3); flashScreen(.12);
+    for (let k = 0; k < 34; k++) sparks.spawn(_v2.copy(g).setY(.3), _v.set(rnd(1, -1), rnd(1.6, .4), rnd(1, -1)).normalize().multiplyScalar(rnd(10, 3)), k % 3 ? col : EC('fire', 'core'), rnd(1.2, .5), rnd(.9, .4), { grav: 9, drag: .97 });
+    for (const e of enemies.within(g, 3.2)) { const d = e.pos.distanceTo(g); _d.subVectors(e.pos, g).setY(0).normalize(); burn(e, 3, 1); enemies.hit(e, 4, _d, col, { knock: 10 * (1 - d / 4.5), fxScale: 1.1, lift: .6 }); }
+  }
+  explodeIce(p) {
+    ringAt(p, 2.2, EC('ice'), .4, .12); bursts.spawn(p, 1.4, PALE_ICE, .25);
+    for (let k = 0; k < 16; k++) { const a = k * TAU / 16; bullets.fire(p, _d.set(Math.cos(a), 0, Math.sin(a)), { speed: 12, life: .55, dmg: .9, scale: .7, knock: 3, col: PALE_ICE, chill: true }); }
+  }
+  update(dt) {
+    this.o.forEach((o, i) => {
+      if (!o.alive) return; o.t += dt; o.pos.addScaledVector(o.vel, dt); o.emit -= dt;
+      if (o.type === 'fire') {
+        for (let k = 0; k < 2; k++) sparks.spawn(_v2.copy(o.pos).add(_v.set(rnd(.3, -.3), rnd(.3, -.3), rnd(.3, -.3))), _hv.copy(o.vel).multiplyScalar(-.15).add(_v.set(0, rnd(2, .5), 0)), k ? EC('fire') : EC('fire', 'core'), .8, .4, { grav: -2, drag: .95 });
+        const hit = enemies.nearest(o.pos, .9);
+        if (hit || o.t >= o.dur) { o.alive = false; this.mesh.setMatrixAt(i, ZERO); this.explodeFire(o.pos); return; }
+      } else {
+        if (o.emit <= 0) { o.emit = .07; o.ang += .95; for (const k of [0, Math.PI]) bullets.fire(o.pos, _d.set(Math.cos(o.ang + k), 0, Math.sin(o.ang + k)), { speed: 11, life: .6, dmg: .8, scale: .65, knock: 2, col: PALE_ICE, chill: true }); }
+        sparks.spawn(o.pos, _hv.set(rnd(.4, -.4), rnd(.4, -.4), rnd(.4, -.4)), EC('ice', 'core'), .4, .3, { grav: 0, drag: .9 });
+        if (o.t >= o.dur) { o.alive = false; this.mesh.setMatrixAt(i, ZERO); this.explodeIce(o.pos.clone()); return; }
+      }
+      const r = (o.type === 'fire' ? .55 : .42) * (1 + Math.sin(o.t * 20) * .08);
+      this.mesh.setMatrixAt(i, _m.compose(o.pos, _q.identity(), _s.set(r, r, r)));
+      this.mesh.setColorAt(i, o.type === 'fire' ? _c.copy(EC('fire', 'core')).lerp(EC('fire'), .4) : _c.copy(PALE_ICE));
+    });
+    this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true;
+  }
+}
+const orbs = new Orbs(10);
+const castFireball = () => orbs.spawn('fire');
+const castFrozenOrb = () => orbs.spawn('ice');
+// 光標槍（D2 亞馬遜 Lightning Fury）：命中後電弧擴散到周圍所有怪
+const javGeo = mergeGeos([{ geo: new THREE.CylinderGeometry(.035, .035, 1.8, 6), m: new THREE.Matrix4().makeRotationX(Math.PI / 2) }, { geo: new THREE.ConeGeometry(.09, .4, 6), m: new THREE.Matrix4().makeRotationX(Math.PI / 2).setPosition(0, 0, 1.05) }]);
+const javelins = [];
+function castJavelin() {
+  const mesh = new THREE.Mesh(javGeo, goldMat); scene.add(mesh); const dir = aimDir(14); dir.y = .06; dir.normalize();
+  const from = muzzle('javelin'); javelins.push({ mesh, pos: from, vel: dir.multiplyScalar(22), t: 0 }); bursts.spawn(from, .4, C('core'), .12);
+}
+function fury(p) {
+  const col = C('main'), c = p.clone().setY(.9), list = [...enemies.live()].sort((a, b) => a.pos.distanceToSquared(c) - b.pos.distanceToSquared(c)).filter(e => e.pos.distanceTo(c) < 7).slice(0, 10);
+  ringAt(c, 1.4, col, .3, .16); bursts.spawn(c, 1.1, C('core'), .2); pillars.spawn(c, .25, 3, col, .2);
+  list.forEach((e, j) => { bolts.fire(c, _v.copy(e.pos).setY(e.size * .9), col, .24, .07, .13); const d = new THREE.Vector3().subVectors(e.pos, c).setY(0).normalize(); after(j * .03, () => enemies.hit(e, 1.8, d, col, { knock: 3, fxScale: .8, depth: 1 })); });
+}
+function updateJavelins(dt) {
+  for (let i = javelins.length - 1; i >= 0; i--) {
+    const j = javelins[i]; j.t += dt; j.vel.y -= 2 * dt; j.pos.addScaledVector(j.vel, dt);
+    j.mesh.position.copy(j.pos); j.mesh.lookAt(_v.copy(j.pos).add(j.vel));
+    sparks.spawn(j.pos, _hv.set(0, 0, 0), C('core'), .35, .2, { grav: 0 });
+    const hit = enemies.nearest(j.pos, .7);
+    if (hit || j.pos.y < .1 || j.t > 1.3) { if (hit) { _d.copy(j.vel).normalize(); enemies.hit(hit, 2, _d, C('main'), { knock: 4, fxScale: 1 }); } fury(j.pos); scene.remove(j.mesh); javelins.splice(i, 1); }
+  }
+}
+// 胡鬧：香蕉迴力鏢／椰子雨／捶胸怒吼
+const banana = new THREE.Group();
+{ const peel = new THREE.Mesh(new THREE.TorusGeometry(.75, .15, 8, 16, Math.PI * .85), new THREE.MeshStandardMaterial({ color: 0xffd93b, roughness: .6 })); const tipM = new THREE.MeshStandardMaterial({ color: 0x4a2e12 }); const t1 = new THREE.Mesh(new THREE.SphereGeometry(.13, 8, 6), tipM); t1.position.set(.75, 0, 0); const t2 = t1.clone(); t2.position.set(Math.cos(Math.PI * .85) * .75, Math.sin(Math.PI * .85) * .75, 0); banana.add(peel, t1, t2); banana.visible = false; scene.add(banana); }
+let bananaState = null;
+function castBanana() { if (bananaState) return; const dir = aimDir(12); bananaState = { t: 0, dur: 1.6, dir, right: new THREE.Vector3().crossVectors(dir, UP).normalize() }; banana.visible = true; }
+function updateBanana(dt) {
+  const s = bananaState; if (!s) return; s.t += dt; const k = s.t / s.dur;
+  if (k >= 1) { bananaState = null; banana.visible = false; return; }
+  banana.position.copy(player.pos).addScaledVector(s.dir, Math.sin(k * Math.PI) * 7).addScaledVector(s.right, Math.sin(k * TAU) * 2.4).setY(1.0); banana.rotation.y += 12 * dt; banana.rotation.x = .4;
+  for (const e of enemies.live()) if (e.pos.distanceToSquared(_v.copy(banana.position).setY(0)) < (e.size + 1.0) ** 2) {
+    const last = e.cd.get('bn') ?? -9; if (s.t - last < .4) continue; e.cd.set('bn', s.t);
+    e.slip = .8; e.root = Math.max(e.root, .8); _d.copy(s.dir).applyAxisAngle(UP, 1.3); enemies.hit(e, 1.5, _d, GOLD, { knock: 3, fxScale: .9 });
+    for (let i = 0; i < 4; i++) sparks.spawn(_v2.copy(e.pos).setY(e.size * 1.6), _hv.set(rnd(1, -1), rnd(1.5, .5), rnd(1, -1)), GOLD, .5, .6, { grav: -1, drag: .95 });
+  }
+}
+class Coconuts {
+  constructor(n) {
+    this.n = n; this.mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(.27, 10, 8), new THREE.MeshStandardMaterial({ color: 0x5a3a1e, roughness: .95 }), n); this.mesh.frustumCulled = false;
+    for (let i = 0; i < n; i++) this.mesh.setMatrixAt(i, ZERO);
+    this.c = Array.from({ length: n }, () => ({ alive: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), t: 0 })); this.cursor = 0; scene.add(this.mesh);
+  }
+  drop(p) { const c = this.c[this.cursor]; this.cursor = (this.cursor + 1) % this.n; c.alive = true; c.t = 0; c.pos.set(p.x + rnd(2.5, -2.5), rnd(10, 8), p.z + rnd(2.5, -2.5)); c.vel.set(rnd(2, -2), 0, rnd(2, -2)); }
+  update(dt) {
+    this.c.forEach((c, i) => {
+      if (!c.alive) return; c.t += dt; c.vel.y -= 16 * dt; c.pos.addScaledVector(c.vel, dt);
+      if (c.pos.y < .27) { c.pos.y = .27; c.vel.y *= -.78; c.vel.x = c.vel.x * .9 + rnd(2, -2); c.vel.z = c.vel.z * .9 + rnd(2, -2); ringAt(c.pos, .8, GOLD, .25, .2); for (let k = 0; k < 3; k++) sparks.spawn(c.pos, _hv.set(rnd(2, -2), rnd(3, 1), rnd(2, -2)), new THREE.Color(0x8a6a3e), .5, .4, { grav: 10 }); }
+      for (const e of enemies.live()) if (e.pos.distanceToSquared(_v.copy(c.pos).setY(0)) < (e.size + .5) ** 2 && c.pos.y < e.size * 2.2) { const last = e.cd.get('cc') ?? -9; if (c.t - last < .3) continue; e.cd.set('cc', c.t); _d.copy(c.vel).setY(0).normalize(); enemies.hit(e, 1.2, _d, GOLD, { knock: 6, fxScale: .9, lift: .4 }); c.vel.x = -c.vel.x * .6 + rnd(2, -2); c.vel.z = -c.vel.z * .6 + rnd(2, -2); c.vel.y = Math.max(c.vel.y, 4); }
+      if (c.t > 4.5) { c.alive = false; this.mesh.setMatrixAt(i, ZERO); bursts.spawn(c.pos, .5, new THREE.Color(0x8a6a3e), .2); return; }
+      this.mesh.setMatrixAt(i, _m.compose(c.pos, _q.setFromEuler(new THREE.Euler(c.t * 6, c.t * 4, 0)), _s.set(1, 1, 1)));
+    });
+    this.mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+const coconuts = new Coconuts(14);
+function castCoconuts() { const c = aimPoint(); for (let i = 0; i < 10; i++) after(i * .08, () => coconuts.drop(c)); toast('🥥 <b>椰子雨</b>'); }
+let chestState = null;
+function castChest() { if (chestState) return; chestState = { t: 0, fired: false }; }
+function updateChest(dt) {
+  const s = chestState; if (!s) return; s.t += dt;
+  if (!s.fired && s.t > .3) {
+    s.fired = true; const p = player.pos; flashScreen(.1); player.glow.scale.setScalar(2.2); toast('🦍 <b>捶胸怒吼</b>');
+    for (let i = 0; i < 3; i++) after(i * .09, () => ringAt(p, 7, GOLD, .6, .05));
+    for (const e of enemies.within(p, 7)) { e.dizzy = 1.8; e.root = Math.max(e.root, 1.8); _d.subVectors(e.pos, p).setY(0).normalize(); enemies.hit(e, .5, _d, GOLD, { knock: 4, fxScale: .5, small: true }); }
+  }
+  if (s.t > .9) chestState = null;
+}
+function updateV3(dt) { updateV4(dt); updateSaws(dt); updateShuriken(dt); updateHands(dt); meteors.update(dt); orbs.update(dt); updateJavelins(dt); updateBanana(dt); coconuts.update(dt); updateChest(dt); }
+
+// ───────────────────────── V4：VR 第一人稱會驚艷的那種 ─────────────────────────
+// 噴火槍：右手扇形連噴 2.2 秒；VR 裡是用手掃
+let flameState = null;
+function castFlame() { if (flameState) return; flameState = { t: 0, dur: 2.2, tick: 0, dir: aimDir(8) }; }
+function updateFlame(dt) {
+  const f = flameState; if (!f) return; f.t += dt; f.tick -= dt;
+  if (f.t >= f.dur) { flameState = null; return; }
+  f.dir.lerp(aimDir(8), 1 - Math.pow(.05, dt)).normalize();
+  const from = muzzleOf('flame') ?? handPos(1).addScaledVector(f.dir, .4), drop = Math.max(0, from.y - 1) * 2.2; // 槍口在高處 → 火往下噴
+  for (let i = 0; i < 7; i++) { _hv.copy(f.dir).multiplyScalar(rnd(10, 6)).add(_v.set(rnd(1.6, -1.6), rnd(1.4, -.4) - drop, rnd(1.6, -1.6))); sparks.spawn(from, _hv, i % 3 === 0 ? EC('fire', 'core') : (i % 3 === 1 ? EC('fire') : EC('fire', 'dark')), rnd(1.3, .7), rnd(.5, .3), { grav: -2.5, drag: .93 }); }
+  bursts.spawn(from, .35, EC('fire', 'core'), .08);
+  if (f.tick <= 0) { f.tick = .12; for (const e of enemies.live()) { _v.subVectors(e.pos, player.pos).setY(0); const d = _v.length(); if (d < 5.5 && _v.normalize().dot(f.dir) > .8) { burn(e, 2, 1.5); _d.copy(f.dir); enemies.hit(e, .5, _d, EC('fire'), { knock: 1.5, fxScale: .4, small: true }); } } }
+}
+// 防護罩：半球罩 6 秒，怪撞到彈開；吸收 5 下或時間到就爆開
+const shieldMat = new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 }, uHit: { value: 0 }, uCol: { value: new THREE.Color(0xffc94d) } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  vertexShader: `varying vec3 vN; varying vec3 vP; varying vec3 vW; void main(){ vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); vP=mv.xyz; vW=position; gl_Position=projectionMatrix*mv; }`,
+  fragmentShader: `uniform float uT; uniform float uHit; uniform vec3 uCol; varying vec3 vN; varying vec3 vP; varying vec3 vW;
+    void main(){ float fres=pow(1.0-abs(dot(normalize(vN),normalize(-vP))),2.5);
+      float lon=atan(vW.z,vW.x); float hex=step(0.93,abs(sin(lon*9.0+uT*0.6)))+step(0.93,abs(sin(vW.y*6.0-uT*0.9)));
+      float a=fres*0.55+hex*0.045+uHit*0.3; gl_FragColor=vec4(uCol*(1.0+uHit*1.5),a*0.7); }` });
+const shieldMesh = new THREE.Mesh(new THREE.SphereGeometry(2.6, 28, 14, 0, TAU, 0, Math.PI / 2), shieldMat); shieldMesh.visible = false; scene.add(shieldMesh);
+let shieldState = null;
+function castShield() { if (shieldState) return; shieldState = { t: 0, dur: 6, hp: 5, hit: 0 }; shieldMesh.visible = true; ringAt(player.pos, 2.4, C('main'), .4, .14); }
+function breakShield() {
+  const p = player.pos, col = C('main'); shieldState = null; shieldMesh.visible = false;
+  ringAt(p, 4.2, col, .5, .1); bursts.spawn(_v2.copy(p).setY(1), 2.6, C('core'), .3); flashScreen(.08);
+  for (let i = 0; i < 40; i++) { const a = rnd(TAU), h = rnd(Math.PI / 2); sparks.spawn(_v2.set(p.x + Math.cos(a) * Math.cos(h) * 2.3, Math.sin(h) * 2.3, p.z + Math.sin(a) * Math.cos(h) * 2.3), _v.set(Math.cos(a), .5, Math.sin(a)).multiplyScalar(rnd(6, 3)), i % 3 ? col : C('core'), rnd(1, .5), .7, { grav: 8 }); }
+  for (const e of enemies.within(p, 4.2)) { _d.subVectors(e.pos, p).setY(0).normalize(); enemies.hit(e, 2, _d, col, { knock: 10, fxScale: .9, lift: .5 }); }
+}
+function updateShield(dt) {
+  const s = shieldState; if (!s) return; s.t += dt; s.hit = Math.max(0, s.hit - dt * 4);
+  shieldMesh.position.copy(player.pos); shieldMat.uniforms.uT.value = t; shieldMat.uniforms.uHit.value = s.hit; shieldMat.uniforms.uCol.value.copy(C('main'));
+  for (const e of enemies.live()) {
+    _v.subVectors(e.pos, player.pos).setY(0); const d = _v.length(), R = 2.6 + e.size * .5;
+    if (d < R) { _v.normalize(); e.pos.copy(player.pos).addScaledVector(_v, R); if ((e.cd.get('sh') ?? -9) < s.t - .5) { e.cd.set('sh', s.t); s.hp--; s.hit = 1; _d.copy(_v); enemies.hit(e, .8, _d, C('main'), { knock: 9, fxScale: .7 }); ringAt(e.pos, 1, C('main'), .25, .2); } }
+  }
+  if (s.hp <= 0 || s.t >= s.dur) breakShield();
+}
+// 黑洞：吸 2.6 秒再爆開，VR 裡看怪從身邊飛過去
+const holes = [];
+function castHole() { const live = [...enemies.live()]; const c = live.length ? enemies.densest(live, 3).pos.clone() : aimPoint(); const m = new THREE.Mesh(new THREE.SphereGeometry(.5, 16, 12), new THREE.MeshBasicMaterial({ color: 0x000000 })); m.position.copy(c).setY(1.2); scene.add(m); holes.push({ pos: c, mesh: m, t: 0, dur: 2.6, ring: 0 }); ringAt(c, 5, EC('volt', 'dark'), .6, .05); }
+function updateHoles(dt) {
+  for (let i = holes.length - 1; i >= 0; i--) {
+    const h = holes[i]; h.t += dt; h.ring -= dt; const k = h.t / h.dur, c = _v2.copy(h.pos).setY(1.2);
+    if (k >= 1) {
+      scene.remove(h.mesh); holes.splice(i, 1); flashScreen(.2); bursts.spawn(c, 3, WHITE, .35); ringAt(h.pos, 5.5, WHITE, .5, .08); ringAt(h.pos, 2.5, EC('volt'), .3, .16); crackAt(h.pos, 3, EC('volt'), 2);
+      for (let j = 0; j < 40; j++) sparks.spawn(c, _v.set(rnd(1, -1), rnd(1, -1), rnd(1, -1)).normalize().multiplyScalar(rnd(14, 6)), j % 2 ? WHITE : EC('volt'), rnd(1, .5), .8, { grav: 6 });
+      for (const e of enemies.within(h.pos, 3.5)) { _d.subVectors(e.pos, h.pos).setY(0).normalize(); enemies.hit(e, 5, _d, EC('volt'), { knock: 14, fxScale: 1.4, lift: 1.2 }); }
+      continue;
+    }
+    h.mesh.scale.setScalar(1 + k * 1.6);
+    for (let j = 0; j < 6; j++) { const a = rnd(TAU), r = rnd(4.5, 2.5), y = rnd(2.5, .2); _v.set(h.pos.x + Math.cos(a) * r, y, h.pos.z + Math.sin(a) * r); _hv.subVectors(c, _v).normalize().multiplyScalar(6).add(_s.set(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(4)); sparks.spawn(_v, _hv, j % 2 ? EC('volt') : EC('volt', 'dark'), .5, .45, { grav: 0, drag: 1 }); }
+    if (h.ring <= 0) { h.ring = .18; ringAt(h.pos, 4.5, EC('volt', 'dark'), .5, .04); }
+    for (const e of enemies.within(h.pos, 5.5)) { const d = e.pos.distanceTo(h.pos); _d.subVectors(h.pos, e.pos).setY(0).normalize(); e.pos.addScaledVector(_d, Math.min(d, (7 * (1 - d / 6) + 1) * dt)); e.lift = Math.max(e.lift, 1.2 * (1 - d / 5.5) * k); e.spin += 6 * dt; e.vel.multiplyScalar(.8); }
+  }
+}
+// 雷暴雲：頭上一朵烏雲跟著你 10 秒，隨機劈雷；VR 抬頭看得到
+function castStorm() {
+  if (summons.some(s => s.type === 'storm')) return;
+  const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: 0x2a2838, roughness: 1, emissive: 0x3a2060, emissiveIntensity: .4 });
+  for (let i = 0; i < 7; i++) { const s = new THREE.Mesh(new THREE.SphereGeometry(rnd(.95, .55), 10, 8), m); s.position.set(rnd(1.4, -1.4), rnd(.4, -.2), rnd(1.4, -1.4)); g.add(s); }
+  g.position.copy(player.pos).setY(4.6); scene.add(g); summons.push({ type: 'storm', g, pos: player.pos.clone(), t: 0, dur: 10, cd: .5, mat: m, flash: 0 });
+}
+// 冰牆：前方 7 根冰柱擋 4 秒，碰到減速；到時間碎掉
+const wallMesh = new THREE.InstancedMesh(new THREE.OctahedronGeometry(.5, 0), new THREE.MeshStandardMaterial({ color: 0xcfefff, roughness: .25, metalness: .1, emissive: 0x2466d6, emissiveIntensity: .35, transparent: true, opacity: .85 }), 42); wallMesh.frustumCulled = false; scene.add(wallMesh);
+const wallItems = Array.from({ length: 42 }, () => ({ alive: false, pos: new THREE.Vector3(), t: 0, dur: 4, h: 1, rot: 0 })); let wallCursor = 0; const walls = [];
+function castWall() {
+  const dir = aimDir(10), right = new THREE.Vector3().crossVectors(dir, UP).normalize(), c = player.pos.clone().addScaledVector(dir, 2.6), pts = [];
+  for (let i = -3; i <= 3; i++) { const p = c.clone().addScaledVector(right, i * .75); pts.push(p); const w = wallItems[wallCursor]; wallCursor = (wallCursor + 1) % 42; w.alive = true; w.pos.copy(p); w.t = 0; w.dur = 4; w.h = rnd(2.6, 1.6); w.rot = rnd(TAU); }
+  walls.push({ pts, n: dir.clone(), t: 0, dur: 4 }); ringAt(c, 2.8, PALE_ICE, .35, .1);
+  for (let i = 0; i < 14; i++) sparks.spawn(_v2.copy(c).addScaledVector(right, rnd(2.5, -2.5)).setY(.2), _hv.set(0, rnd(4, 2), 0), PALE_ICE, .6, .5, { grav: 8 });
+}
+function updateWalls(dt) {
+  wallItems.forEach((w, i) => {
+    if (!w.alive) return; w.t += dt;
+    if (w.t >= w.dur) { w.alive = false; wallMesh.setMatrixAt(i, ZERO); for (let k = 0; k < 5; k++) sparks.spawn(_v2.copy(w.pos).setY(rnd(w.h)), _hv.set(rnd(2, -2), rnd(3, 1), rnd(2, -2)), PALE_ICE, .8, .6, { grav: 9 }); return; }
+    const rise = Math.min(1, w.t / .2); wallMesh.setMatrixAt(i, _m.compose(_v.set(w.pos.x, w.h * rise * .5, w.pos.z), _q.setFromEuler(new THREE.Euler(0, w.rot, 0)), _s.set(.9, w.h * rise, .5)));
+  });
+  wallMesh.instanceMatrix.needsUpdate = true;
+  for (let i = walls.length - 1; i >= 0; i--) {
+    const w = walls[i]; w.t += dt; if (w.t >= w.dur) { walls.splice(i, 1); continue; }
+    for (const e of enemies.live()) for (const p of w.pts) {
+      _v.subVectors(e.pos, p).setY(0); const d = _v.length(), R = .75 + e.size * .6;
+      if (d < R) { const side = Math.sign(_v.dot(w.n)) || 1; e.pos.addScaledVector(w.n, side * (R - d)); e.vel.multiplyScalar(.5); addChill(e); if ((e.cd.get('wl') ?? -9) < w.t - .6) { e.cd.set('wl', w.t); _d.copy(w.n).multiplyScalar(side); enemies.hit(e, .6, _d, PALE_ICE, { knock: 4, fxScale: .5, small: true }); } break; }
+    }
+  }
+}
+// 合掌光束：蓄力 0.45 秒、雙手合掌掃射 1.25 秒（VR：你真的把兩手合起來）
+let beamState = null;
+function castBeam() { if (beamState) return; beamState = { t: 0, charge: .45, dur: 1.7, dir: aimDir(14), tick: 0 }; }
+function updateBeam(dt) {
+  const b = beamState; if (!b) return; b.t += dt; b.tick -= dt;
+  const origin = muzzleOf('beam') ?? player.pos.clone().addScaledVector(fwd(), .9).setY(1.1);
+  if (b.t < b.charge) { for (let i = 0; i < 4; i++) { _v.set(rnd(1.5, -1.5), rnd(1.5, -1.5), rnd(1.5, -1.5)).add(origin); _hv.subVectors(origin, _v).multiplyScalar(5); sparks.spawn(_v, _hv, C('core'), .5, .3, { grav: 0, drag: 1 }); } player.glow.scale.setScalar(1 + b.t * 3); return; }
+  if (b.t >= b.dur) { beamState = null; return; }
+  b.dir.lerp(aimDir(14), 1 - Math.pow(.02, dt)).normalize(); const end = origin.clone().addScaledVector(b.dir, 14).setY(.8);
+  bolts.fire(origin, end, C('main'), .07, .32, .012); bolts.fire(origin, end, C('core'), .07, .12, .02); bursts.spawn(origin, .9, C('core'), .1);
+  for (let i = 0; i < 3; i++) sparks.spawn(origin.clone().lerp(end, rnd()), _hv.set(rnd(2, -2), rnd(2, .5), rnd(2, -2)), C('main'), .5, .3, { grav: 0, drag: .9 });
+  if (b.tick <= 0) {
+    b.tick = .1; ringAt(end, 1.6, C('main'), .25, .14);
+    for (const e of enemies.live()) { _v.subVectors(e.pos, origin).setY(0); const along = _v.dot(b.dir); if (along < 0 || along > 14) continue; _hv.copy(b.dir).multiplyScalar(along); if (_v.sub(_hv).length() < 1.1 + e.size * .5) { _d.copy(b.dir); enemies.hit(e, 1.3, _d, C('main'), { knock: 7, fxScale: .8, lift: .4 }); } }
+  }
+}
+// 時緩領域：3.5m 內怪物慢 85%，5 秒
+function castSlowField() { const live = [...enemies.live()]; const p = live.length ? enemies.densest(live, 3).pos.clone() : aimPoint(); pools.push({ type: 'slow', pos: p, r: 3.5, t: 0, dur: 5, tick: 0, pulse: 0, vis: discAt(p, 3.5, new THREE.Color(0x6fa8ff), 5) }); ringAt(p, 3.6, PALE_ICE, .5, .08); }
+// 聖光環（被動）：每秒一圈
+let auraOn = false, auraCd = 0;
+function updateAura(dt) {
+  if (!auraOn) return; auraCd -= dt; if (auraCd > 0) return; auraCd = 1;
+  const col = EC('holy'); ringAt(player.pos, 3.2, col, .6, .08);
+  for (let i = 0; i < 6; i++) sparks.spawn(_v2.set(player.pos.x + rnd(2.5, -2.5), .1, player.pos.z + rnd(2.5, -2.5)), _hv.set(0, rnd(2, 1), 0), EC('holy', 'core'), .45, .6, { grav: -1, drag: .97 });
+  for (const e of enemies.within(player.pos, 3.2)) { _d.subVectors(e.pos, player.pos).setY(0).normalize(); enemies.hit(e, .8, _d, col, { knock: 2, fxScale: .5, small: true }); }
+}
+function updateV4(dt) { updateFlame(dt); updateShield(dt); updateHoles(dt); updateWalls(dt); updateBeam(dt); updateAura(dt); }
+
+const WEAPONS = [
+  { id: 'shotgun', icon: '🔫', short: '霰彈', name: '霰彈（7 顆、短距、大擊退）', group: '投射', key: 'KeyQ', k: 'Q', cd: 1.1, cast: castShotgun },
+  { id: 'missiles', icon: '🚀', short: '追蹤飛彈', name: '追蹤飛彈 ×5（先散開再追）', group: '投射', key: 'KeyE', k: 'E', cd: 1.6, cast: castMissiles },
+  { id: 'bomb', icon: '💣', short: '炸彈', name: '炸彈（會彈跳、1.1 秒引爆）', group: '投射', key: 'KeyR', k: 'R', cd: 2.4, cast: castBomb },
+  { id: 'gas', icon: '🧪', short: '毒霧彈', name: '毒霧彈（落地成 5 秒毒池）', group: '投射', key: 'KeyF', k: 'F', cd: 3.2, cast: castGas },
+  { id: 'fireball', icon: '🔥', short: '大火球', name: '大火球（慢、大、炸一圈引燃）', group: '投射', key: 'KeyU', k: 'U', cd: 2.6, cast: castFireball },
+  { id: 'frozenorb', icon: '❄️', short: '冰封球', name: '冰封球（D2 法師：邊飛邊灑冰箭、終點炸開）', group: '投射', key: 'KeyI', k: 'I', cd: 2.8, cast: castFrozenOrb },
+  { id: 'javelin', icon: '⚡', short: '光標槍', name: '光標槍（D2 亞馬遜：命中後電弧擴散全場）', group: '投射', key: 'KeyO', k: 'O', cd: 1.8, on: true, cast: castJavelin },
+  { id: 'claw', icon: '🐾', short: '爪擊', name: '爪擊（三道、扇形）', group: '近身', key: 'KeyC', k: 'C', cd: .9, cast: castClaw },
+  { id: 'whirl', icon: '🌪', short: '旋風衝鋒', name: '旋風衝鋒（野蠻人）', group: '近身', key: 'KeyV', k: 'V', cd: 3, cast: castWhirl },
+  { id: 'scythe', icon: '🪓', short: '迴旋鐮刀', name: '迴旋鐮刀（飛出去再回來）', group: '近身', key: 'KeyT', k: 'T', cd: 1.9, cast: castScythe },
+  { id: 'fist', icon: '👊', short: '大拳頭', name: '天降大拳頭（砸最密的一群）', group: '近身', key: 'KeyG', k: 'G', cd: 3.6, cast: castFist },
+  { id: 'saw', icon: '⚙️', short: '迴旋鋸刃', name: '迴旋鋸刃（在怪之間彈 6 下再飛回）', group: '近身', key: 'KeyH', k: 'H', cd: 2.2, cast: castSaw },
+  { id: 'shuriken', icon: '✴️', short: '大手裡劍', name: '大型手裡劍（穿透一整排、去回各切一次）', group: '近身', key: 'KeyJ', k: 'J', cd: 2.4, cast: castShuriken },
+  { id: 'spikes', icon: '🗻', short: '地刺區', name: '地刺區（碰到就掉血、頂飛）', group: '場地', key: 'KeyX', k: 'X', cd: 2.6, cast: castSpikes },
+  { id: 'fissure', icon: '🪨', short: '裂地', name: '裂地（往前竄的一條裂縫）', group: '場地', key: 'KeyZ', k: 'Z', cd: 3, cast: castFissure },
+  { id: 'trap', icon: '🪤', short: '陷阱', name: '陷阱（踩到才炸）', group: '場地', key: 'Digit1', k: '1', cd: 2, cast: castTrap },
+  { id: 'web', icon: '🕸', short: '蜘蛛網', name: '蜘蛛網／冰網（定身 4 秒）', group: '場地', key: 'KeyN', k: 'N', cd: 3.4, cast: castWeb },
+  { id: 'meteors', icon: '☄️', short: '隕石雨', name: '隕石雨（區域：8 顆隕石依序砸、先預警）', group: '場地', key: 'KeyL', k: 'L', cd: 4.5, cast: castMeteors },
+  { id: 'hydra', icon: '🐉', short: '三頭火龍', name: '三頭火龍（定點、自己打）', group: '召喚', key: 'Digit4', k: '4', cd: 9.5, on: true, cast: castHydra },
+  { id: 'turret', icon: '🗼', short: '哨塔', name: '哨塔（定點、快速點射）', group: '召喚', key: 'Digit5', k: '5', cd: 11.5, cast: castTurret },
+  { id: 'tornado', icon: '🌀', short: '龍捲風', name: '龍捲風（遊走、吸怪頂飛）', group: '召喚', key: 'Digit6', k: '6', cd: 7.5, cast: castTornado },
+  { id: 'wisp', icon: '🔮', short: '小幫手', name: '小幫手（自走、撞怪爆；按鍵開關）', group: '召喚', key: 'Digit7', k: '7', cd: 0, passive: true },
+  { id: 'hands', icon: '🫴', short: '地獄手', name: '地獄手（5 隻手抓住拖住，最後一起捏）', group: '召喚', key: 'KeyK', k: 'K', cd: 5, cast: castHands },
+  { id: 'banana', icon: '🍌', short: '香蕉鏢', name: '香蕉迴力鏢（踩到滑倒、轉圈圈）', group: '胡鬧', key: 'KeyP', k: 'P', cd: 2.2, cast: castBanana },
+  { id: 'coconuts', icon: '🥥', short: '椰子雨', name: '椰子雨（10 顆亂彈、彈到誰誰痛）', group: '胡鬧', key: 'KeyM', k: 'M', cd: 4, cast: castCoconuts },
+  { id: 'chest', icon: '🦍', short: '捶胸怒吼', name: '捶胸怒吼（全場暈眩冒星星、定身 1.8 秒）', group: '胡鬧', key: 'KeyY', k: 'Y', cd: 6, cast: castChest },
+  { id: 'flame', icon: '🔥', short: '噴火槍', name: '噴火槍（右手扇形連噴 2.2 秒，VR 用手掃）', group: '手持', key: 'Digit8', k: '8', cd: 4, on: true, cast: castFlame },
+  { id: 'beam', icon: '💥', short: '合掌光束', name: '合掌光束（蓄力 0.45 秒、雙手合掌掃射 1.25 秒）', group: '手持', key: 'BracketLeft', k: '[', cd: 6, cast: castBeam },
+  { id: 'shield', icon: '🛡', short: '防護罩', name: '防護罩（半球罩 6 秒，怪撞到彈開，吸收 5 下後爆開）', group: '防護／領域', key: 'Digit9', k: '9', cd: 9, on: true, cast: castShield },
+  { id: 'wall', icon: '🧊', short: '冰牆', name: '冰牆（前方 7 根冰柱擋 4 秒，碰到減速）', group: '防護／領域', key: 'Equal', k: '=', cd: 5, cast: castWall },
+  { id: 'slow', icon: '⏳', short: '時緩領域', name: '時緩領域（3.5m 內怪物慢 85%，5 秒）', group: '防護／領域', key: 'BracketRight', k: ']', cd: 8, cast: castSlowField },
+  { id: 'aura', icon: '😇', short: '聖光環', name: '聖光環（被動：每秒一圈 3.2m 光環；按鍵開關）', group: '防護／領域', key: 'Semicolon', k: ';', cd: 0, passive: true },
+  { id: 'hole', icon: '🕳', short: '黑洞', name: '黑洞（吸 2.6 秒再爆開，全場飛出去）', group: '場地', key: 'Digit0', k: '0', cd: 7, on: true, cast: castHole },
+  { id: 'storm', icon: '⛈', short: '雷暴雲', name: '雷暴雲（頭上烏雲跟著你 10 秒，隨機劈雷）', group: '召喚', key: 'Minus', k: '-', cd: 12, on: true, cast: castStorm },
+];
+const GROUP_ORDER = ['手持', '投射', '近身', '場地', '召喚', '防護／領域', '胡鬧'];
+WEAPONS.forEach(w => { w.on = !!w.on; w.t = rnd(w.cd); });
+function updateWeapons(dt) {
+  const hasTarget = !!enemies.nearest(player.pos, 14);
+  for (const w of WEAPONS) {
+    if (w.passive) { if (w.id === 'wisp') ensureWisp(w.on); else if (w.id === 'aura') auraOn = w.on; continue; }
+    w.t -= dt;
+    if (W.autoCast && w.on && w.t <= 0 && hasTarget) { w.t = w.cd; w.cast(); slotKick(w); }
+  }
+}
+function manualCast(w) { if (w.passive) { setEquip(w, !w.on); return; } w.t = w.cd * .5; w.cast(); slotKick(w); toast(`${w.icon} <b>${w.short}</b>`); }
+const MAX_SLOTS = 6;
+const equipped = () => WEAPONS.filter(w => w.on);
+function setEquip(w, on) {
+  if (on && !w.on && equipped().length >= MAX_SLOTS) { toast('身上只能帶 <b>6</b> 把，先卸一把'); $('#w_' + w.id).checked = false; return false; }
+  w.on = on; $('#w_' + w.id).checked = on; rebuildSlots(); assignBodySlots(); return true;
+}
+let slotSig = null;
+function rebuildSlots() {
+  const eq = equipped(), sig = eq.map(w => w.id).join(','); if (sig === slotSig) return; slotSig = sig;
+  const box = $('#slots'); box.innerHTML = '';
+  for (let i = 0; i < MAX_SLOTS; i++) {
+    const w = eq[i], d = document.createElement('div'); d.className = 'slot' + (w ? '' : ' empty');
+    const th = w && WEAPON_MODEL[w.id] && thumbs[WEAPON_MODEL[w.id][0]];
+    d.innerHTML = w ? `<div class="cd"></div>${th ? `<img src="${th}" alt="">` : `<span class="ic">${w.icon}</span>`}<span class="nm">${w.short}</span><kbd>${w.k}</kbd>` : '<span class="nm">空格</span>';
+    if (w) d.title = w.name + (WEAPON_MODEL[w.id] ? `｜模型：${MODEL_INFO[WEAPON_MODEL[w.id][0]]}` : '｜程式生成');
+    if (w) d.addEventListener('click', () => manualCast(w)); box.appendChild(d);
+  }
+}
+function updateSlots() { const eq = equipped(), els = $('#slots').children; for (let i = 0; i < eq.length && i < els.length; i++) { const cd = els[i].querySelector('.cd'); if (cd) cd.style.height = (eq[i].passive ? 0 : clamp(eq[i].t / eq[i].cd, 0, 1) * 100) + '%'; } }
+
+// ═════════════════════ 沙盒 POC：模型載入（file:// 可用） ═════════════════════
+// models.js 把 assets/**/*.glb 轉成 base64 data URI（window.GG_MODELS），這裡 atob → ArrayBuffer → GLTFLoader.parse，
+// 全程不 fetch 檔案，所以雙擊 index.html（file://）也能載入。換模型：改 assets/ 後跑 `node tools/build-models.mjs`。
+const MODELS = { gltf: {}, total: 0, done: 0, ready: false };
+const weaponPrefab = {}; // 模型 key → { obj: 已置中、槍管轉到 +Z 的 Group, half: 槍口到中心距離 }
+const thumbs = {};       // 模型 key → 縮圖 dataURL（上方 6 格用）
+function dataUriToBuffer(uri) { const bin = atob(uri.slice(uri.indexOf(',') + 1)); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
+function loadModels() {
+  const src = window.GG_MODELS;
+  if (!src || !THREE.GLTFLoader) { $('#modelStatus').textContent = '找不到 models.js／GLTFLoader，改用程式生成造型'; applyLook(); return; }
+  const keys = Object.keys(src), loader = new THREE.GLTFLoader(); MODELS.total = keys.length;
+  const done = () => { MODELS.done++; $('#modelStatus').textContent = `模型 ${Object.keys(MODELS.gltf).length}/${MODELS.total}`; if (MODELS.done === MODELS.total) onModelsReady(); };
+  for (const k of keys) {
+    let buf; try { buf = dataUriToBuffer(src[k]); } catch (err) { console.error('[模型] base64 解碼失敗', k, err); done(); continue; }
+    loader.parse(buf, '', g => { MODELS.gltf[k] = g; done(); }, err => { console.error('[模型] 解析失敗', k, err); done(); });
+  }
+}
+function makeWeaponPrefab(key) {
+  const g = MODELS.gltf['weapons/' + key]; if (!g) return;
+  const src = g.scene.clone(); src.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(src), size = box.getSize(new THREE.Vector3()), ctr = box.getCenter(new THREE.Vector3());
+  const len = Math.max(size.x, size.y, size.z), s = clamp(len * 1.9, .62, 1.25) / len; // 原尺寸 0.3–1.0 → 身邊 0.62–1.25m
+  src.position.sub(ctr);
+  const mid = new THREE.Group(); mid.rotation.y = -Math.PI / 2; mid.scale.setScalar(s); mid.add(src); // 模型 +X（槍管）→ +Z，方便 lookAt
+  const obj = new THREE.Group(); obj.add(mid);
+  weaponPrefab[key] = { obj, half: (box.max.x - ctr.x) * s };
+}
+function makeThumbs() {
+  let r; try { r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); } catch (err) { return; }
+  r.setSize(112, 112, false); r.outputEncoding = THREE.sRGBEncoding; r.toneMapping = THREE.ACESFilmicToneMapping;
+  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff, 0x3a3340, 1.25)); const dl = new THREE.DirectionalLight(0xffffff, 1.1); dl.position.set(1, 3, 4); sc.add(dl);
+  const cm = new THREE.PerspectiveCamera(30, 1, .01, 50); cm.position.set(0, .45, 2.6); cm.lookAt(0, 0, 0);
+  for (const k in weaponPrefab) { const o = weaponPrefab[k].obj.clone(); o.rotation.set(.12, Math.PI / 2, 0); sc.add(o); r.render(sc, cm); thumbs[k] = r.domElement.toDataURL('image/png'); sc.remove(o); }
+  r.dispose(); r.forceContextLoss && r.forceContextLoss();
+}
+function onModelsReady() {
+  for (const k in MODEL_INFO) makeWeaponPrefab(k);
+  makeThumbs(); MODELS.ready = true;
+  const n = Object.keys(MODELS.gltf).length;
+  $('#modelStatus').textContent = n === MODELS.total ? `模型 ${n}/${MODELS.total} 已載入` : `模型 ${n}/${MODELS.total}（有缺，看 console）`;
+  applyLook(); slotSig = null; rebuildSlots(); assignBodySlots(true);
+}
+
+// ═════════════════════ 外觀：程式生成猩猩 / 英雄 GLB ═════════════════════
+function applyLook() {
+  const key = HERO_MODELS[W.look], g = key && MODELS.gltf[key];
+  while (player.hero.children.length) player.hero.remove(player.hero.children[0]);
+  if (g) { const m = g.scene.clone(); m.scale.setScalar(HERO_FIT.scale); player.hero.add(m); }
+  const useHero = !!g;
+  player.proc.visible = player.hL.visible = player.hR.visible = !useHero;
+  if (useHero) player.handBase.set(...HERO_FIT.hand); else player.handBase.set(.66, .2, .45);
+}
+
+// ═════════════════════ 身上 6 個槽位：武器模型繞在猩猩背後、各自瞄準 ═════════════════════
+const emojiTex = {};
+function emojiSprite(icon) {
+  if (!emojiTex[icon]) { const cv = document.createElement('canvas'); cv.width = cv.height = 96; const x = cv.getContext('2d'); x.font = '72px "Apple Color Emoji","Segoe UI Emoji",sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(icon, 48, 54); emojiTex[icon] = new THREE.CanvasTexture(cv); }
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: emojiTex[icon], transparent: true, depthWrite: false })); sp.userData.base = .62; return sp;
+}
+const bodySlots = Array.from({ length: MAX_SLOTS }, () => { const holder = new THREE.Group(); holder.visible = false; scene.add(holder); return { holder, model: null, w: null, half: .2, kick: 0, pop: 0, init: false, built: false, pos: new THREE.Vector3() }; });
+function assignBodySlots(force = false) {
+  const eq = equipped();
+  bodySlots.forEach((s, i) => {
+    const w = eq[i] || null; if (!force && s.w === w && s.built === MODELS.ready) return;
+    if (s.model) s.holder.remove(s.model);
+    const changed = s.w !== w; s.w = w; s.built = MODELS.ready; s.model = null; s.kick = 0;
+    if (!w) { s.holder.visible = false; return; }
+    const mm = WEAPON_MODEL[w.id], pf = mm && weaponPrefab[mm[0]];
+    if (pf) { s.model = pf.obj.clone(); s.model.userData.base = 1; s.half = pf.half; } else { s.model = emojiSprite(w.icon); s.half = .2; }
+    s.holder.add(s.model); s.holder.visible = true; if (changed) s.pop = 1;
+  });
+}
+function muzzleOf(id) { // 有裝在身上、而且是 GLB 模型 → 回傳槍口世界座標
+  const s = bodySlots.find(s => s.w && s.w.id === id && s.init && s.model && !s.model.isSprite); if (!s) return null;
+  s.holder.updateMatrixWorld(); return s.holder.localToWorld(new THREE.Vector3(0, 0, s.half + .05));
+}
+function slotKick(w) { // 施放：後座力＋槍口發光 pop
+  const s = bodySlots.find(s => s.w === w); if (!s || !s.init) return;
+  s.kick = 1; s.holder.updateMatrixWorld();
+  const tip = s.holder.localToWorld(new THREE.Vector3(0, 0, s.half + .05));
+  bursts.spawn(tip, s.model && s.model.isSprite ? .5 : .38, C('core'), .14); ringAt(player.pos, .9, C('main'), .2, .2);
+  for (let i = 0; i < 6; i++) sparks.spawn(tip, _v.set(rnd(1, -1), rnd(1, -.2), rnd(1, -1)).multiplyScalar(rnd(4, 1.5)), i % 2 ? C('main') : C('core'), .45, .25, { grav: 2, drag: .9 });
+}
+const _slotAim = new THREE.Vector3(), _slotLocal = new THREE.Vector3();
+function updateBodySlots(dt, t) {
+  const tgt = enemies.nearest(player.pos, 14);
+  if (tgt) _slotAim.set(tgt.pos.x, tgt.size * .9 + tgt.lift, tgt.pos.z); else _slotAim.copy(player.pos).addScaledVector(fwd(), 8).setY(1.2);
+  bodySlots.forEach((s, i) => {
+    if (!s.w || !s.model) return;
+    const o = SLOT_OFFSETS[i];
+    _slotLocal.set(o[0], o[1] + Math.sin(t * 2.2 + i * 1.3) * .07, o[2]).applyAxisAngle(UP, player.yaw).add(player.pos);
+    if (!s.init) { s.pos.copy(_slotLocal); s.init = true; } else s.pos.lerp(_slotLocal, 1 - Math.pow(.0004, dt)); // 跟隨有一點點延遲＝漂浮感
+    s.holder.position.copy(s.pos);
+    if (!s.model.isSprite) s.holder.lookAt(_slotAim);
+    s.kick = Math.max(0, s.kick - dt * 6); s.pop = Math.max(0, s.pop - dt * 3);
+    const k = s.kick * s.kick, sc = s.model.userData.base * (1 + k * .22 + Math.sin(s.pop * Math.PI) * .45);
+    s.model.position.set(0, 0, -k * .3); s.model.scale.setScalar(sc);
+    if (!s.model.isSprite) s.model.rotation.x = -k * .55; // 槍口上揚
+  });
+}
+
+// ═════════════════════ 玩家 HP（只有 Boss 會打人；一般怪維持原型行為不攻擊） ═════════════════════
+const PLAYER = { hp: PLAYER_HP, down: false, hurt: 0 };
+function hurtPlayer(dmg, src = null) {
+  if (PLAYER.down) return;
+  PLAYER.hurt = W.god ? .45 : 1;
+  numbers.spawn(_v2.copy(player.pos).setY(2.3), W.god ? '0' : String(dmg), false, W.god ? '#9a9b9f' : '#ff4d5e');
+  bursts.spawn(_v2.copy(player.pos).setY(1), .9, new THREE.Color(0xff3048), .18);
+  if (src) { _v.subVectors(player.pos, src).setY(0); if (_v.lengthSq() > 1e-4) player.pos.addScaledVector(_v.normalize(), .5); }
+  if (W.god) return;
+  PLAYER.hp = Math.max(0, PLAYER.hp - dmg);
+  if (PLAYER.hp <= 0) { PLAYER.down = true; toast('🦍 猩猩倒下了，<b>2 秒</b>後復活'); after(2, () => { PLAYER.hp = PLAYER_HP; PLAYER.down = false; ringAt(player.pos, 3, GOLD, .5, .1); pillars.spawn(player.pos, .6, 4, GOLD, .4); }); }
+}
+function updatePlayerHP(dt) { // 紅框跟著 step(dt) 淡出（不靠 rAF，背景分頁手動推進也正確）
+  PLAYER.hurt = Math.max(0, PLAYER.hurt - dt * 2.2);
+  $('#hurt').style.opacity = PLAYER.hurt.toFixed(3);
+  $('#hpFill').style.width = (PLAYER.hp / PLAYER_HP * 100).toFixed(1) + '%'; $('#hpTxt').textContent = Math.ceil(PLAYER.hp);
+  $('#hpBox').classList.toggle('god', W.god);
+}
+
+// ═════════════════════ Boss：CoffinHopper 骷髏球 ═════════════════════
+// Boss 本身是 enemies 陣列裡的一格（e.boss = true），所以所有武器的索敵（nearest／within／live）
+// 與唯一命中入口 enemies.hit → applyElements 都直接適用，燃燒／冰凍／中毒等狀態也照樣套。
+// 位置由 boss.pos 決定（每幀覆寫 e.pos），黑洞／龍捲風之類的拉扯對 Boss 無效。
+let boss = null;
+const BOSS_PURPLE = new THREE.Color(0xb58cff), BOSS_GREEN = new THREE.Color(0x8cff3a), WARN_RED = new THREE.Color(0xff2a3a);
+function summonBoss() {
+  const g = MODELS.gltf[BOSS.model];
+  if (!g || !THREE.SkeletonUtils) { toast('Boss 模型還沒載入'); return; }
+  if (boss) { toast('Boss 已經在場上'); return; }
+  const at = player.pos.clone().add(_v.set(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw)).multiplyScalar(11)); at.y = 0; // 生在鏡頭看出去的方向
+  const e = enemies.spawn('boss', at); if (!e) { toast('怪物滿了，先清場'); return; }
+  e.boss = true; e.size = BOSS.size; e.speed = BOSS.speed;
+  const model = THREE.SkeletonUtils.clone(g.scene), mats = [];
+  model.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.frustumCulled = false; mats.push(o.material); } });
+  model.scale.setScalar(BOSS.scale);
+  const root = new THREE.Group(); root.add(model); scene.add(root);
+  const mixer = new THREE.AnimationMixer(model), actions = {};
+  for (const c of g.animations) actions[c.name] = mixer.clipAction(c);
+  boss = { e, root, model, mats, mixer, actions, cur: null, state: 'intro', st: 0, atkT: BOSS.tri.every, jumpT: BOSS.slam.every, ringT: 2, phase: 1, hitCd: 0,
+    pos: at.clone(), y: 0, yaw: Math.atan2(player.pos.x - at.x, player.pos.z - at.z), strafe: 1, strafeT: 2.5, slamAt: new THREE.Vector3(), jumpFrom: new THREE.Vector3(), deathT: 0, ring: false };
+  mixer.addEventListener('finished', ev => { if (!boss || boss.e.dying) return; if (ev.action === boss.actions.Hit || ev.action === boss.actions.Attack) bossPlay(boss.state === 'move' ? 'Walk' : 'Idle'); });
+  bossPlay('Idle');
+  pillars.spawn(at, 1.2, 9, BOSS_PURPLE, .7); ringAt(at, 5, BOSS_PURPLE, .7, .08); crackAt(at, 4, BOSS_GREEN, 2.4); flashScreen(.12);
+  toast('💀 <b>CoffinHopper 骷髏球</b> 出現了');
+}
+function bossPlay(name, once = false, fade = .15, ts = 1) {
+  const a = boss.actions[name]; if (!a) return;
+  if (boss.cur === a && !once) { a.timeScale = ts; return; }
+  a.reset(); a.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity); a.clampWhenFinished = once; a.timeScale = ts; a.play();
+  if (boss.cur && boss.cur !== a) a.crossFadeFrom(boss.cur, fade, false);
+  boss.cur = a;
+}
+function bossOnHit(e) { // 被打：短 Hit（只在移動狀態、有冷卻，不打斷攻擊）
+  if (!boss || e !== boss.e || e.dying) return;
+  if (boss.state === 'move' && boss.hitCd <= 0 && e.frozen <= 0) { boss.hitCd = BOSS.hitAnimCd; bossPlay('Hit', true, .08); }
+}
+function bossSetState(s) { boss.state = s; boss.st = 0; }
+function bossFace(dt, k = 8) { const want = Math.atan2(player.pos.x - boss.pos.x, player.pos.z - boss.pos.z); let d = want - boss.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); boss.yaw += d * (1 - Math.exp(-k * dt)); }
+function bossMouth() { return new THREE.Vector3(boss.pos.x + Math.sin(boss.yaw) * 1.6, boss.y + 2.2, boss.pos.z + Math.cos(boss.yaw) * 1.6); }
+function bossTriShot() {
+  const from = bossMouth(), base = Math.atan2(player.pos.x - from.x, player.pos.z - from.z), T = BOSS.tri;
+  for (let i = 0; i < T.count; i++) { const a = base + (i - (T.count - 1) / 2) * T.spread; fireSkull(from, new THREE.Vector3(Math.sin(a), -.08, Math.cos(a)), T.speed, T.homing, T.dmg); }
+  bursts.spawn(from, 1.2, BOSS_PURPLE, .2);
+}
+function bossRingShot() {
+  const from = bossMouth().setY(boss.y + 1.6), P = BOSS.phase2;
+  for (let i = 0; i < P.ringCount; i++) { const a = boss.yaw + i * TAU / P.ringCount; fireSkull(from, new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), BOSS.tri.speed * .9, 0, BOSS.tri.dmg); }
+  ringAt(boss.pos, 3.5, BOSS_GREEN, .5, .1); bursts.spawn(from, 1.6, BOSS_GREEN, .25);
+}
+function bossShock(c, r, dmg, col) { // 落地震波：沿用 ① 震波環＋⑥ 地裂
+  ringAt(c, r, col, .55, .09); ringAt(c, r * .5, WHITE, .3, .16); crackAt(c, r * .85, col, 2.2); bursts.spawn(_v2.copy(c).setY(.5), r * .45, col, .25); pillars.spawn(c, .8, 4, col, .3); flashScreen(.14);
+  for (let i = 0; i < 40; i++) { const a = rnd(TAU); sparks.spawn(_v2.set(c.x, .1, c.z), _v.set(Math.cos(a), rnd(1, .3), Math.sin(a)).multiplyScalar(rnd(10, 4)), i % 3 ? col : new THREE.Color(0x6b6e78), rnd(1.3, .6), rnd(.8, .4), { grav: 12 }); }
+  for (const n of enemies.within(c, r)) if (!n.boss) { _hv.subVectors(n.pos, c).setY(0).normalize(); n.vel.addScaledVector(_hv, 8); n.lift = Math.max(n.lift, .6); } // 小怪被震開（不扣血）
+  if (_v.subVectors(player.pos, c).setY(0).length() < r) hurtPlayer(dmg, c);
+}
+function updateBoss(e, dt) {
+  const b = boss; if (!b || b.e !== e) { e.alive = false; return; }
+  e.lift = 0; e.vel.set(0, 0, 0); b.st += dt; b.hitCd -= dt;
+  if (e.dying) { // 死亡：播 Death（三顆骷髏噴出）→ 播完大爆炸＋金色碎塊飛向玩家
+    if (b.state !== 'dying') { bossSetState('dying'); bossPlay('Death', true, .1); toast('💀 <b>CoffinHopper</b> 倒下！'); }
+    b.y = Math.max(0, b.y - dt * 8); b.mixer.update(dt); bossSync(e, dt);
+    if (b.st >= b.actions.Death.getClip().duration + .1) bossExplode(e);
+    return;
+  }
+  updateStatus(e, dt);
+  if (e.hp <= 0) { e.dying = true; e.deathCol.copy(statusColor(e)); return; }
+  if (b.phase === 1 && e.hp < e.maxhp * BOSS.phase2.at) { // 進階段 2：一次大震波
+    b.phase = 2; b.ringT = 1.5; bossShock(b.pos, BOSS.phase2.shockR, BOSS.phase2.shockDmg, BOSS_PURPLE); toast('💀 Boss 進入<b>階段 2</b>：骷髏環射＋加速');
+  }
+  if (e.frozen > 0) { b.mixer.timeScale = 0; bossSync(e, dt); return; } // 凍住：動畫停格、AI 暫停
+  const slow = Math.min(e.slow, .5); b.mixer.timeScale = 1 - slow * .6;
+  const spd = BOSS.speed * (b.phase === 2 ? BOSS.phase2.speedMul : 1) * (1 - slow);
+  b.atkT -= dt; b.jumpT -= dt; if (b.phase === 2) b.ringT -= dt;
+  switch (b.state) {
+    case 'intro': bossFace(dt); if (b.st > .8) { bossSetState('move'); bossPlay('Walk'); } break;
+    case 'move': {
+      bossFace(dt);
+      _v.subVectors(player.pos, b.pos).setY(0); const d = _v.length(); _v.normalize();
+      b.strafeT -= dt; if (b.strafeT <= 0) { b.strafeT = rnd(3.5, 2); b.strafe *= -1; }
+      if (d > BOSS.keepMax) _d.copy(_v); else if (d < BOSS.keepMin) _d.copy(_v).negate(); else _d.set(-_v.z * b.strafe, 0, _v.x * b.strafe);
+      const ph = b.actions.Walk.time / b.actions.Walk.getClip().duration, hop = Math.sin(ph * Math.PI); // 一個 Walk 循環＝一跳
+      b.y = hop * BOSS.hopH;
+      b.pos.addScaledVector(_d, spd * dt * (.35 + hop * 1.3) * (e.root > 0 ? .3 : 1)); // 空中才往前衝＝彈跳前進；Boss 被定身只減速 70%，不會被網／地獄手永久定住
+      if (b.jumpT <= 0) { bossSetState('tele'); b.slamAt.copy(player.pos).setY(0); ringAt(b.slamAt, BOSS.slam.radius, WARN_RED, BOSS.slam.tele, .05); discAt(b.slamAt, BOSS.slam.radius, WARN_RED, BOSS.slam.tele + .15); bossPlay('Idle', false, .1, 2); }
+      else if (b.atkT <= 0) { bossSetState('attack'); b.ring = false; bossPlay('Attack', true, .1); after(.45, () => boss && !boss.e.dying && bossTriShot()); }
+      else if (b.phase === 2 && b.ringT <= 0) { bossSetState('attack'); b.ring = true; bossPlay('Attack', true, .1); after(.45, () => boss && !boss.e.dying && bossRingShot()); }
+      break;
+    }
+    case 'attack': bossFace(dt, 4); b.y = Math.max(0, b.y - dt * 6);
+      if (b.st >= b.actions.Attack.getClip().duration * .85) { if (b.ring) b.ringT = BOSS.phase2.ringEvery; else b.atkT = BOSS.tri.every; bossSetState('move'); bossPlay('Walk'); }
+      break;
+    case 'tele': bossFace(dt, 4); b.y = Math.max(0, b.y - dt * 6); // 紅圈預警 0.9 秒（圈在玩家腳下的「當時位置」）
+      if (b.st >= BOSS.slam.tele) { bossSetState('jump'); b.jumpFrom.copy(b.pos); bossPlay('Walk', false, .1, 1.6); }
+      break;
+    case 'jump': { const k = clamp(b.st / BOSS.slam.jump, 0, 1);
+      b.pos.lerpVectors(b.jumpFrom, b.slamAt, k * k * (3 - 2 * k)); b.y = Math.sin(k * Math.PI) * BOSS.slam.height;
+      if (Math.random() < .5) sparks.spawn(_v2.set(b.pos.x, b.y + 1, b.pos.z), _v.set(rnd(1, -1), -1, rnd(1, -1)), BOSS_PURPLE, .6, .4, { grav: 2 });
+      if (k >= 1) { b.y = 0; bossShock(b.slamAt, BOSS.slam.radius, BOSS.slam.dmg, BOSS_PURPLE); bossSetState('land'); bossPlay('Idle', false, .1); }
+      break; }
+    case 'land': if (b.st >= .6) { b.jumpT = BOSS.slam.every; bossSetState('move'); bossPlay('Walk'); } break;
+  }
+  b.mixer.update(dt); bossSync(e, dt);
+}
+function bossSync(e, dt) {
+  const b = boss; e.pos.copy(b.pos).setY(0);
+  b.root.position.set(b.pos.x, b.y, b.pos.z); b.root.rotation.y = b.yaw;
+  e.flash = Math.max(0, e.flash - dt * 7);
+  b.model.scale.setScalar(BOSS.scale * (1 + e.flash * .05));
+  // 元素狀態 → 染色。這顆模型是「底色黑＋emissiveMap」的無光照做法，所以從原本的 emissive（白）往狀態色偏，受擊時整體提亮
+  for (const m of b.mats) {
+    if (!m.emissive) continue; if (!m.userData.baseEm) m.userData.baseEm = m.emissive.clone();
+    _c.copy(m.userData.baseEm);
+    if (e.burnT > 0) _c.lerp(EC('fire'), .35); if (e.poisonT > 0) _c.lerp(EC('toxic'), .3); if (e.chill > 0) _c.lerp(EC('ice'), .3);
+    if (e.cond > 0) _c.lerp(EC('volt'), .3); if (e.mark > 0) _c.lerp(EC('holy'), .12 * e.mark); if (e.frozen > 0) _c.lerp(PALE_ICE, .7);
+    if (b.phase === 2) _c.lerp(BOSS_PURPLE, .15);
+    m.emissive.copy(_c).multiplyScalar(1 + e.flash * 1.4);
+  }
+}
+function bossExplode(e) {
+  const b = boss, c = _v2.copy(b.pos).setY(1.5);
+  flashScreen(.3); bursts.spawn(c, 4.5, WHITE, .4); bursts.spawn(c, 3, BOSS_PURPLE, .5);
+  ringAt(b.pos, 9, BOSS_PURPLE, .7, .07); ringAt(b.pos, 5, BOSS_GREEN, .5, .12); ringAt(b.pos, 2.5, WHITE, .3, .2); crackAt(b.pos, 6, BOSS_PURPLE, 3); pillars.spawn(b.pos, 1.6, 12, BOSS_PURPLE, .7);
+  for (let i = 0; i < 90; i++) sparks.spawn(c, _v.set(rnd(1, -1), rnd(1.6, .2), rnd(1, -1)).normalize().multiplyScalar(rnd(16, 5)), i % 3 === 0 ? BOSS_GREEN : i % 3 === 1 ? BOSS_PURPLE : new THREE.Color(0xe8e2d0), rnd(2.4, 1), rnd(1.4, .7), { grav: 12 });
+  for (let i = 0; i < 70; i++) { _v.set(rnd(1, -1), rnd(1.8, .8), rnd(1, -1)).normalize().multiplyScalar(rnd(9, 4)); sparks.spawn(c, _v, GOLD, rnd(1.6, 1), 4, { grav: 9, drag: .985, target: player.pos, delay: rnd(.9, .35) }); }
+  for (const n of enemies.within(b.pos, 6)) if (!n.boss) { _hv.subVectors(n.pos, b.pos).setY(0).normalize(); enemies.hit(n, 6, _hv, BOSS_PURPLE, { knock: 12, fxScale: 1, lift: 1, noElem: true }); }
+  onDeathElements(e);
+  scene.remove(b.root); b.mixer.stopAllAction();
+  e.alive = false; enemies.kills++; enemies.killLog.push(performance.now()); boss = null;
+  toast('🏆 <b>Boss 擊破</b>');
+}
+// 骷髏彈：紫綠色、慢速、輕微追蹤；防護罩擋得住
+const skullGeo = mergeGeos([{ geo: new THREE.SphereGeometry(.3, 12, 10), m: new THREE.Matrix4() }, { geo: new THREE.BoxGeometry(.32, .14, .22), m: new THREE.Matrix4().makeTranslation(0, -.24, .08) }]);
+const skullMat = new THREE.MeshStandardMaterial({ color: 0xe9e3d2, roughness: .6, emissive: 0x6a3cc8, emissiveIntensity: .9 });
+const skullEyeMat = new THREE.MeshBasicMaterial({ color: 0x8cff3a });
+const skullHaloMat = new THREE.MeshBasicMaterial({ color: 0x8cff3a, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false });
+const bossShots = [];
+function fireSkull(from, dir, speed, homing, dmg) {
+  const g = new THREE.Group(); g.add(new THREE.Mesh(skullGeo, skullMat));
+  for (const x of [-.11, .11]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), skullEyeMat); eye.position.set(x, .02, .26); g.add(eye); }
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(.5, 12, 10), skullHaloMat));
+  g.position.copy(from); scene.add(g);
+  bossShots.push({ g, vel: dir.clone().normalize().multiplyScalar(speed), speed, homing, dmg, t: 0 });
+}
+function updateBossShots(dt) {
+  const tgt = _d.copy(player.pos).setY(1.1);
+  for (let i = bossShots.length - 1; i >= 0; i--) {
+    const s = bossShots[i]; s.t += dt;
+    if (s.homing > 0) { _v.subVectors(tgt, s.g.position).normalize().multiplyScalar(s.speed); s.vel.lerp(_v, 1 - Math.exp(-s.homing * dt)).setLength(s.speed); }
+    s.g.position.addScaledVector(s.vel, dt); s.g.lookAt(_v.copy(s.g.position).add(s.vel)); s.g.rotateZ(Math.sin(s.t * 12) * .2);
+    if (Math.random() < .7) sparks.spawn(s.g.position, _v.set(rnd(.5, -.5), rnd(.5, -.5), rnd(.5, -.5)), Math.random() < .5 ? BOSS_GREEN : BOSS_PURPLE, .5, .35, { grav: 0, drag: .9 });
+    let gone = s.t > 6 || s.g.position.y < .1;
+    const d = s.g.position.distanceTo(tgt);
+    if (!gone && shieldState && _v.subVectors(s.g.position, player.pos).setY(0).length() < 2.7) { shieldState.hp--; shieldState.hit = 1; ringAt(s.g.position, 1, C('main'), .25, .2); gone = true; }
+    else if (!gone && d < .95) { hurtPlayer(s.dmg, s.g.position); gone = true; }
+    if (gone) { bursts.spawn(s.g.position, .8, BOSS_GREEN, .2); for (let k = 0; k < 8; k++) sparks.spawn(s.g.position, _v.set(rnd(1, -1), rnd(1, -1), rnd(1, -1)).multiplyScalar(4), k % 2 ? BOSS_PURPLE : BOSS_GREEN, .6, .4, { grav: 6 }); scene.remove(s.g); bossShots.splice(i, 1); }
+  }
+}
+const _bossTop = new THREE.Vector3();
+function updateBossBar() {
+  const el = $('#bossBar');
+  if (!boss) { el.style.display = 'none'; return; }
+  const p = _bossTop.set(boss.pos.x, boss.y + 4.6, boss.pos.z).project(camera);
+  if (p.z > 1) { el.style.display = 'none'; return; }
+  el.style.display = 'block'; el.style.left = (p.x * .5 + .5) * innerWidth + 'px'; el.style.top = (-p.y * .5 + .5) * innerHeight + 'px';
+  $('#bossFill').style.width = clamp(boss.e.hp / boss.e.maxhp * 100, 0, 100).toFixed(1) + '%';
+  $('#bossPhase').textContent = boss.e.dying ? '擊破' : `階段 ${boss.phase}｜${Math.max(0, Math.ceil(boss.e.hp * 10))}`;
+}
+
+// ───────────────────────── 鏡頭、輸入 ─────────────────────────
+const cam = { yaw: .7, pitch: .55, dist: 13, target: new THREE.Vector3() };
+let dragging = false, lx = 0, ly = 0;
+canvas.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY; });
+addEventListener('pointerup', () => dragging = false);
+addEventListener('pointermove', e => { if (!dragging) return; cam.yaw -= (e.clientX - lx) * .006; cam.pitch = clamp(cam.pitch + (e.clientY - ly) * .005, .15, 1.3); lx = e.clientX; ly = e.clientY; });
+canvas.addEventListener('wheel', e => { cam.dist = clamp(cam.dist + e.deltaY * .01, 5, 28); }, { passive: true });
+const keys = new Set();
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  keys.add(e.code);
+  if (e.code === 'Space') { e.preventDefault(); slam(); }
+  if (e.code === 'KeyB' && !e.repeat) summonBoss();
+  const w = WEAPONS.find(w => w.key === e.code); if (w && !e.repeat) manualCast(w);
+});
+addEventListener('keyup', e => keys.delete(e.code));
+
+// ───────────────────────── UI ─────────────────────────
+function bindRange(id, fmt = v => v) { const el = $('#' + id), out = $('#' + id + 'V'); const f = () => { W[id] = +el.value; if (out) out.textContent = fmt(el.value); }; el.addEventListener('input', f); f(); }
+function bindCheck(id) { const el = $('#' + id); el.addEventListener('change', () => W[id] = el.checked); W[id] = el.checked; }
+bindRange('hammers'); bindRange('chainJumps'); bindRange('hitstop', v => v + ' ms'); bindRange('knock'); bindRange('spawnRate'); bindRange('maxEnemies');
+['drone', 'chain', 'killBoom', 'numbers', 'labels', 'autoCast', 'fpv', 'god'].forEach(bindCheck);
+$('#toon').addEventListener('change', e => TOON.value = e.target.checked ? 1 : 0);
+function seg(id, set, onChange) {
+  const box = $('#' + id);
+  box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { box.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); set(b.dataset.v); onChange && onChange(); }));
+}
+seg('hammerSeg', v => W.hammerMode = v); seg('skySeg', v => W.sky = v);
+seg('pTierSeg', v => EL.pT = +v, refreshElemUI); seg('sTierSeg', v => EL.sT = +v, refreshElemUI);
+function elemButtons(boxId, withNone, get, set) {
+  const box = $('#' + boxId); box.innerHTML = '';
+  const mk = (k, label, color) => { const b = document.createElement('button'); b.dataset.v = k; b.textContent = label; if (color) b.style.borderBottom = `2px solid #${color.toString(16).padStart(6, '0')}`; if (k === get()) b.classList.add('on'); box.appendChild(b); };
+  if (withNone) mk('none', '無');
+  for (const k in ELEM) mk(k, ELEM[k].name, ELEM[k].main);
+  seg(boxId, set, refreshElemUI);
+}
+elemButtons('pSeg', false, () => EL.p, v => { EL.p = v; if (EL.s === v) EL.s = 'none'; });
+elemButtons('sSeg', true, () => EL.s, v => { EL.s = v === EL.p ? 'none' : v; });
+function refreshElemUI() {
+  $('#sSeg').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === EL.s));
+  const ck = compoundKey(), cp = ck && COMPOUND[ck];
+  $('#compoundName').textContent = cp ? `混搭：${cp.name}` : (EL.s !== 'none' && hasEl('holy') ? '混搭：聖光擴散' : '');
+  const tierTxt = (el, t) => ELEM[el].tier.slice(0, t).map((s, i) => `<b>${'I II III'.split(' ')[i]}</b> ${s}`).join('　');
+  let h = `<b>${ELEM[EL.p].name}</b> ${tierTxt(EL.p, EL.pT)}`;
+  if (EL.s !== 'none') h += `<br><b>副・${ELEM[EL.s].name}</b> ${tierTxt(EL.s, EL.sT)}`;
+  if (cp) h += `<br><b>${cp.name}</b>：${cp.desc}`; else if (EL.s !== 'none' && hasEl('holy')) h += `<br><b>聖光擴散</b>：光柱把另一個元素的 I 階傳給周圍 1.3m 的怪`;
+  $('#elemHint').innerHTML = h;
+  player.glow.material.color.copy(C('main'));
+}
+refreshElemUI();
+{
+  const list = $('#weaponList'); let g = '';
+  for (const w of [...WEAPONS].sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group))) {
+    if (w.group !== g) { g = w.group; const d = document.createElement('div'); d.className = 'wgrp'; d.textContent = g; list.appendChild(d); }
+    const row = document.createElement('div'); row.className = 'wrow';
+    const mm = WEAPON_MODEL[w.id];
+    row.innerHTML = `<input type="checkbox" id="w_${w.id}" ${w.on ? 'checked' : ''}><label for="w_${w.id}">${w.name}${mm ? ` <small>· ${MODEL_INFO[mm[0]]}</small>` : ''}</label><kbd>${w.k}</kbd><button class="mini">放</button>`;
+    row.querySelector('input').addEventListener('change', e => setEquip(w, e.target.checked));
+    row.querySelector('button').addEventListener('click', () => manualCast(w));
+    list.appendChild(row);
+  }
+}
+rebuildSlots();
+$('#slamBtn').addEventListener('click', slam);
+$('#look').addEventListener('change', e => { W.look = e.target.value; applyLook(); });
+$('#bossBtn').addEventListener('click', summonBoss);
+$('#bossHalfBtn').addEventListener('click', () => { if (!boss) { toast('先召喚 Boss（B）'); return; } boss.e.hp = Math.min(boss.e.hp, boss.e.maxhp * .49); });
+const PRESETS = { presetVR: ['flame', 'shield', 'hole', 'javelin', 'hydra', 'storm'], presetGun: ['shotgun', 'missiles', 'gas', 'flame', 'beam', 'web'] };
+for (const id in PRESETS) $('#' + id).addEventListener('click', () => { WEAPONS.forEach(w => { w.on = false; $('#w_' + w.id).checked = false; }); PRESETS[id].forEach(k => { const w = WEAPONS.find(w => w.id === k); w.on = true; $('#w_' + k).checked = true; }); rebuildSlots(); assignBodySlots(); toast(id === 'presetVR' ? '換成 <b>VR 第一人稱組</b>' : '換成 <b>模型展示組</b>'); });
+loadModels();
+$('#waveBtn').addEventListener('click', () => { for (let i = 0; i < 30; i++) enemies.spawnRandom(); });
+$('#clearBtn').addEventListener('click', () => { for (const e of enemies.live()) { e.hp = 0; } });
+const LABELS = [
+  { text: '<i>肩上無人機</i>　自動主火力', get: () => droneWorld.clone().add(new THREE.Vector3(0, .35, 0)), show: () => W.drone },
+  { text: '<i>祝福鐵鎚</i>　腰胸高度環繞', get: () => hammerPos[0].clone().add(new THREE.Vector3(0, .5, 0)), show: () => W.hammers > 0 },
+  { text: '<i>左手</i>　連鎖閃電／毒霧彈', get: () => handWorld.clone().add(new THREE.Vector3(0, .25, 0)), show: () => true },
+  { text: '<i>右手</i>　霰彈／飛彈／炸彈', get: () => handPos(1).add(new THREE.Vector3(0, .25, 0)), show: () => true },
+];
+const labelEls = LABELS.map(l => { const d = document.createElement('div'); d.className = 'lbl'; d.innerHTML = l.text; document.body.appendChild(d); return d; });
+function updateLabels() {
+  LABELS.forEach((l, i) => {
+    const el = labelEls[i]; if (!W.labels || !l.show()) { el.style.display = 'none'; return; }
+    const p = l.get().project(camera); if (p.z > 1) { el.style.display = 'none'; return; }
+    el.style.display = ''; el.style.left = (p.x * .5 + .5) * innerWidth + 'px'; el.style.top = (-p.y * .5 + .5) * innerHeight - 14 + 'px';
+  });
+}
+
+// ───────────────────────── 主迴圈 ─────────────────────────
+function resize() { renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+for (let i = 0; i < 30; i++) enemies.spawnRandom();
+
+let last = performance.now(), t = 0, spawnAcc = 0, fpsS = 60, statT = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, .033); last = now;
+  fpsS += ((1 / Math.max(dt, 1e-3)) - fpsS) * .05;
+  step(dt);
+}
+window.step = step; // 測試／錄影可手動推進時間
+function step(dt) {
+  t += dt;
+  for (let i = timers.length - 1; i >= 0; i--) { const tm = timers[i]; tm.t -= dt; if (tm.t <= 0) { timers.splice(i, 1); tm.fn(); } }
+  if (!player.whirl) {
+    _v.set(0, 0, 0);
+    if (keys.has('KeyW') || keys.has('ArrowUp')) _v.z -= 1; if (keys.has('KeyS') || keys.has('ArrowDown')) _v.z += 1;
+    if (keys.has('KeyA') || keys.has('ArrowLeft')) _v.x -= 1; if (keys.has('KeyD') || keys.has('ArrowRight')) _v.x += 1;
+    if (_v.lengthSq() > 0) { _v.normalize().applyAxisAngle(UP, cam.yaw); player.pos.addScaledVector(_v, 4.8 * dt); player.yaw = Math.atan2(_v.x, _v.z); player.bob += dt * 10; }
+  }
+  player.group.position.copy(player.pos); player.group.rotation.y = player.yaw; player.group.position.y = Math.abs(Math.sin(player.bob)) * .08;
+  player.slamCd -= dt; player.slamAnim = Math.max(0, player.slamAnim - dt * 3.5);
+  const lift = Math.sin(player.slamAnim * Math.PI) * .9, HB = player.handBase; player.hL.position.set(-HB.x, HB.y + lift, HB.z); player.hR.position.set(HB.x, HB.y + lift, HB.z);
+  if (flameState) player.hR.position.set(.45, .95, .9);
+  if (beamState) { player.hL.position.set(-.15, 1.05, .95); player.hR.position.set(.15, 1.05, .95); }
+  if (chestState) { player.hL.position.y = .9 + Math.max(0, Math.sin(chestState.t * 22)) * .5; player.hR.position.y = .9 + Math.max(0, -Math.sin(chestState.t * 22)) * .5; }
+  player.glow.position.copy(player.hL.position);
+  player.glow.scale.lerp(_s.set(1, 1, 1), 1 - Math.pow(.01, dt)); player.glow.material.opacity = .35 + Math.sin(t * 6) * .12 + (player.glow.scale.x - 1) * .4;
+
+  spawnAcc += dt * W.spawnRate;
+  while (spawnAcc >= 1) { spawnAcc -= 1; if (enemies.alive < W.maxEnemies) enemies.spawnRandom(); }
+
+  updateDrone(dt, t); updateHammers(dt, t); updateChain(dt); updateSky(dt); updateKillQueue(dt);
+  updateWeapons(dt); updateV3(dt); updateWhirl(dt); updateScythe(dt); updateFist(dt); updateFields(dt); updateTraps(dt); updateSummons(dt, t); updatePools(dt);
+  enemies.update(dt); updateBossShots(dt); updateBodySlots(dt, t); updatePlayerHP(dt); bullets.update(dt); missiles.update(dt); bombs.update(dt); spikes.update(dt);
+  sparks.update(dt); rings.update(dt); cracks.update(dt); discs.update(dt); webs.update(dt); bursts.update(dt); pillars.update(dt); bolts.update(dt); numbers.update(dt);
+
+  cam.target.lerp(_v.set(player.pos.x, 1, player.pos.z), 1 - Math.pow(.02, dt));
+  player.head.visible = player.eL.visible = player.eR.visible = !W.fpv;
+  player.hero.visible = W.look !== 'proc' && !W.fpv && !!player.hero.children.length;
+  if (W.fpv) { // 第一人稱預覽：鏡頭在猩猩頭的位置，拖曳＝轉頭
+    camera.position.set(player.pos.x, 1.5 + Math.abs(Math.sin(player.bob)) * .05, player.pos.z);
+    camera.lookAt(_v.set(player.pos.x - Math.sin(cam.yaw), 1.5 - (cam.pitch - .5) * 1.2, player.pos.z - Math.cos(cam.yaw)));
+  } else {
+    camera.position.set(cam.target.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist, cam.target.y + Math.sin(cam.pitch) * cam.dist, cam.target.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist);
+    camera.lookAt(cam.target);
+  }
+  renderer.render(scene, camera);
+  updateLabels(); updateSlots(); updateBossBar();
+
+  statT += dt;
+  if (statT > .25) {
+    statT = 0; const nowMs = performance.now(); enemies.killLog = enemies.killLog.filter(x => nowMs - x < 60000);
+    $('#sFps').textContent = Math.round(fpsS); $('#sCalls').textContent = renderer.info.render.calls; $('#sAlive').textContent = enemies.alive;
+    $('#sKpm').textContent = enemies.killLog.length; $('#sKills').textContent = enemies.kills; $('#sChain').textContent = bestChain;
+    $('#tRing').textContent = rings.active; $('#tBurst').textContent = bursts.active; $('#tBolt').textContent = bolts.active; $('#tTrail').textContent = bullets.active + missiles.active;
+    $('#tSpark').textContent = sparks.active; $('#tCrack').textContent = cracks.active + discs.active + webs.active; $('#tPillar').textContent = pillars.active; $('#tNum').textContent = numbers.active;
+  }
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

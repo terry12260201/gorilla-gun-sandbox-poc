@@ -4,7 +4,7 @@
 
 ## 一句話
 
-`index.html` 單檔 Three.js r128 原型：程式生成特效 × 34 把技能 × 5 元素 × 3 階 × 身上 6 把 GLB 武器 × Boss（GLB＋骨架動畫）。不用 build，雙擊或 GitHub Pages 直接跑。
+`index.html` 單檔 Three.js r128 原型：程式生成特效 × 34 把技能 × 5 元素 × 3 階 × 身上 6 把 GLB 武器 × Boss（GLB＋骨架動畫）。不用 build，雙擊或 GitHub Pages 直接跑。介面是「南瓜墨金美學 1.2」：紙底白卡面板＋深炭舞台，金色只給「召喚 Boss」。
 
 ## 執行與驗證
 
@@ -15,35 +15,41 @@
 | 改了 `assets/` | `node tools/build-models.mjs` → commit `models.js` |
 | 自動化測試 | console 呼叫 `step(1/30)` 推進時間（見下方） |
 | 載入成功的判斷 | 面板「角色與 Boss」右側顯示「模型 15/15 已載入」，console 無錯 |
+| 深淺模式 | 導覽列右側月亮／太陽；記在 `localStorage.igTheme`，網址加 `?theme=night` 可直接開深色 |
 
-外部依賴（全部 CDN，版本鎖死 r128）：
+外部依賴（CDN，Three.js 版本鎖死 r128）：
 - `three.min.js`（cdnjs r128）
 - `examples/js/loaders/GLTFLoader.js`、`examples/js/utils/SkeletonUtils.js`（jsdelivr three@0.128.0，非 module 版，掛在 `THREE.*`）
+- Google Fonts：Roboto、Noto Sans TC、Roboto Mono（離線時退回蘋方／微軟正黑，不影響功能）
+
+本機附帶（`vendor/ink-gold/`）：`ink-gold-ui.js`（磁吸點格＋深淺切換，從設計系統原樣複製）、`pumpkin-logo-black.svg`（正式 Logo）。
 
 ## 架構地圖（`index.html`，行號為本版約略位置）
 
 | 行 | 區塊 | 重點 |
 |---|---|---|
-| 1–176 | HTML／CSS | 面板 `#ui`、上方 6 格 `#slots`、玩家 HP `#hpBox`、受擊紅框 `#hurt`、Boss 血條 `#bossBar` |
-| 185–228 | **沙盒 POC 設定表** | `MODEL_INFO`、`WEAPON_MODEL`（武器↔模型）、`SLOT_OFFSETS`（6 槽位置）、`HERO_MODELS`／`HERO_FIT`、`BOSS`（Boss 全部數字）、`PLAYER_HP` |
-| 230–257 | 元素設定 | `ELEM`（5 元素 × 色票 × 三階說明）、`COMPOUND`（混搭）、`EL`（目前選的主副元素）、`W`（所有面板開關，第 255 行） |
-| 258–285 | 場景 | renderer（sRGB＋ACES）、燈、程式生成地板 |
-| 286–315 | 玩家 | `player.group` 底下：`proc`（程式生成猩猩）、`hero`（英雄 GLB 掛點）、`hL/hR`（手的錨點）、`glow`、`drone`；`player.handBase` 決定手的位置 |
-| 316–600 | **特效 8 元件** | 見下表 |
-| 602–706 | 怪物 `Enemies` | InstancedMesh 一次畫完；`hit()` 唯一命中入口；Boss 也住在這個陣列裡 |
-| 717–843 | 元素三階 | `applyOne`／`applyElements`／`onDeathElements`／`updateStatus`／`updatePools` |
-| 844–872 | 投射物 `Bullets` | ④ 拖尾 |
-| 874–960 | V1 基礎 | 無人機、祝福鐵鎚、連鎖閃電、天空落雷、砸地 |
-| 962–1556 | 武器庫 V2／V3／V4 | 每把 `castXxx()`＋`updateXxx(dt)` |
-| 1558–1623 | `WEAPONS` 陣列與裝備 | `updateWeapons`（自動施放）、`manualCast`、`setEquip`、`rebuildSlots`（上方 6 格） |
-| 1625–1666 | **模型載入** | `loadModels` → `onModelsReady`；`makeWeaponPrefab`（置中、縮放、槍管轉 +Z）、`makeThumbs`（離屏渲染縮圖） |
-| 1668–1676 | 外觀 | `applyLook()` |
-| 1678–1724 | **身上 6 槽位** | `assignBodySlots`、`updateBodySlots`（跟隨＋瞄準）、`muzzleOf`／`muzzle`（槍口座標）、`slotKick`（後座＋發光） |
-| 1726–1743 | 玩家 HP | `hurtPlayer(dmg, src)`、`updatePlayerHP(dt)` |
-| 1745–1912 | **Boss** | `summonBoss`、`bossPlay`（動畫切換）、`updateBoss`（狀態機）、`bossSync`（位置＋狀態染色）、`bossShock`、`bossTriShot`／`bossRingShot`、`bossExplode`、骷髏彈 `fireSkull`／`updateBossShots`、`updateBossBar` |
-| 1914–1930 | 鏡頭、輸入 | 拖曳轉鏡頭、滾輪縮放、鍵盤（B＝Boss） |
-| 1931–2000 | UI 綁定 | `bindRange`／`bindCheck`、元素按鈕、武器清單、快速換裝 `PRESETS`、`loadModels()` 起點 |
-| 2001–2065 | 主迴圈 | `frame()` → `step(dt)`；`window.step = step` |
+| 11–433 | **墨金 CSS 套件（原樣內嵌）** | `/* ink-gold kit:start */ … /* ink-gold kit:end */`；所有 `--ig-*` token 在這段的 `:root` |
+| 434–630 | 本專案版面 CSS | 面板 `.gg-panel`、6 格 `#slots`、舞台 `.gg-stage`、HUD（`#hpBox`／`#toolkit`／`#toast`／`#bossBar`／`.lbl`）、900px 以下改直排 |
+| 632–745 | HTML | 導覽 `.gg-nav` → 面板 `#ui` → 格子列 `.gg-bar` → 舞台 `#stage`（`#c` 畫布＋`#hurt`／`#flash`＋HUD） |
+| 761–804 | **沙盒 POC 設定表** | `MODEL_INFO`、`WEAPON_MODEL`（武器↔模型）、`SLOT_OFFSETS`（6 槽位置）、`HERO_MODELS`／`HERO_FIT`、`BOSS`（Boss 全部數字）、`PLAYER_HP` |
+| 805–831 | 元素設定 | `ELEM`（5 元素 × 色票 × 三階說明）、`COMPOUND`（混搭）、`EL`（目前選的主副元素）、`W`（所有面板開關） |
+| 832–861 | 場景 | renderer（sRGB＋ACES）、燈、程式生成地板；舞台底色／霧／地板＝墨金深炭 |
+| 862–891 | 玩家 | `player.group` 底下：`proc`（程式生成猩猩）、`hero`（英雄 GLB 掛點）、`hL/hR`（手的錨點）、`glow`、`drone`；`player.handBase` 決定手的位置 |
+| 892–1177 | **特效 8 元件** | 見下表 |
+| 1178–1292 | 怪物 `Enemies` | InstancedMesh 一次畫完；`hit()` 唯一命中入口；Boss 也住在這個陣列裡 |
+| 1293–1420 | 元素三階 | `applyOne`／`applyElements`／`onDeathElements`／`updateStatus`／`updatePools` |
+| 1421–1449 | 投射物 `Bullets` | ④ 拖尾 |
+| 1450–1537 | V1 基礎 | 無人機、祝福鐵鎚、連鎖閃電、天空落雷、砸地、`flashScreen`、`toast` |
+| 1538–2133 | 武器庫 V2／V3／V4 | 每把 `castXxx()`＋`updateXxx(dt)` |
+| 2134–2200 | `WEAPONS` 陣列與裝備 | `updateWeapons`（自動施放）、`manualCast`、`setEquip`、`rebuildSlots`（上方 6 格，用 `<button>`） |
+| 2201–2244 | **模型載入** | `loadModels` → `onModelsReady`；`makeWeaponPrefab`（置中、縮放、槍管轉 +Z）、`makeThumbs`（離屏渲染縮圖） |
+| 2245–2260 | 外觀 | `applyLook()` |
+| 2261–2301 | **身上 6 槽位** | `assignBodySlots`、`updateBodySlots`（跟隨＋瞄準）、`muzzleOf`／`muzzle`（槍口座標）、`slotKick`（後座＋發光） |
+| 2302–2320 | 玩家 HP | `hurtPlayer(dmg, src)`、`updatePlayerHP(dt)` |
+| 2321–2489 | **Boss** | `summonBoss`、`bossPlay`（動畫切換）、`updateBoss`（狀態機）、`bossSync`（位置＋狀態染色）、`bossShock`、`bossTriShot`／`bossRingShot`、`bossExplode`、骷髏彈 `fireSkull`／`updateBossShots`、`updateBossBar`（座標相對舞台畫布） |
+| 2490–2506 | 鏡頭、輸入 | 拖曳轉鏡頭、滾輪縮放、鍵盤（B＝Boss） |
+| 2507–2578 | UI 綁定 | `bindRange`／`bindCheck`、`seg`＋`syncPressed`（aria-pressed）、元素按鈕（`--el` 色點）、武器清單、快速換裝 `PRESETS`、`loadModels()` 起點、位置標籤 |
+| 2579–2645 | 主迴圈 | `resize()` 跟著舞台大小（`ResizeObserver`）；`frame()` → `step(dt)`；`window.step = step` |
 
 ## 命中入口（最重要的一條規則）
 
@@ -70,7 +76,7 @@
 | ⑦ | 光柱 Pillar | `Pillars` → `pillars.spawn(pos, r, h, col, dur)` | 14 |
 | ⑧ | 傷害數字 Number | `Numbers` → `numbers.spawn(pos, text, crit, col, small)` | 56 |
 
-池子是環狀覆寫（cursor），爆量時最舊的會被蓋掉，不會報錯。右下面板即時顯示各元件數量。
+池子是環狀覆寫（cursor），爆量時最舊的會被蓋掉，不會報錯。舞台右下的特效面板即時顯示各元件數量。
 
 ## 擴充點
 
@@ -86,6 +92,8 @@
 | 換 Boss 模型 | `BOSS.model`；需含 `Idle/Walk/Attack/Hit/Death` 五個 clip |
 | 玩家受擊反饋 | `hurtPlayer()`、`updatePlayerHP()`、CSS `#hurt` |
 | 快速換裝組合 | `PRESETS`（UI 綁定區） |
+| 介面配色／字體 | 只改 `--ig-*` token（套件段）；本專案版面在「工作區版面」段，HUD 底色是 `--gg-hud` |
+| 更新墨金套件 | 新版 `ink-gold.css` 整段貼回 `kit:start`／`kit:end` 之間；`ink-gold-ui.js` 覆蓋 `vendor/ink-gold/` |
 
 ## 測試（`window.step(dt)`）
 
@@ -99,6 +107,8 @@ boss.e.hp = .01; step(1/30); boss.state                          // → 'dying'
 
 驗證過的項目（headless Chrome 走 file://＋線上 Pages）：模型 15/15 載入、console 無錯、6 槽位出現且會瞄準與後座、四種外觀切換、Boss 進場→彈跳→三連彈→紅圈預警→跳砸扣血→階段 2 震波→環射 12 發→Death 動畫→大爆炸＋金色碎塊、375px 寬無水平捲動。
 
+墨金版另外驗證：B 鍵與金色按鈕都能召喚 Boss、Boss 血條與位置標籤落在舞台內、分段按鈕 aria-pressed 跟著切換、深淺切換會記住、1440／1024／768／414／375／320px 頁面寬＝視窗寬（無水平捲動）、面板每列標籤與控制項不重疊、點格游標吸附有反應。
+
 ## 注意事項
 
 1. **所有時間都要走 `step(dt)`**：延遲動作用 `after(秒, fn)`，不要用 `setTimeout`／`performance.now()`；Boss 動畫的 `mixer.update(dt)` 也在 `updateBoss()` 裡。唯一例外是擊殺／分統計（`killLog`）與 `flashScreen()` 的淡出。
@@ -110,6 +120,8 @@ boss.e.hp = .01; step(1/30); boss.state                          // → 'dying'
 7. 按鍵已用：WASD／方向鍵、Space、B（Boss）、以及 `WEAPONS` 裡每把的 `key`（陷阱已從 B 改到 1）。加新武器前先查不要撞鍵。
 8. Three.js 鎖 r128（`examples/js` 非 module 版在 r148 之後被移除），升級版本要改成 ES module 寫法。
 9. 交接文件與 commit 訊息不寫客戶名、發行商、金額、時程與真人分工；分工只寫職能。
+10. **舞台座標**：Boss 血條、位置標籤的 `left/top` 是相對 `#stage`（用 `canvas.clientWidth/clientHeight` 換算），不是整個視窗；新增 3D 跟隨的 HTML 標籤請放進 `#stage`。
+11. **金色只有一顆**：新按鈕預設白底；次要主動作用 `class="ink"`；不要在面板裡再加金色按鈕或金色字。
 
 ## 待確認（交給專案負責人決定）
 

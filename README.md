@@ -1,18 +1,44 @@
 # Gorilla Gun 沙盒模式 POC
 
-**元素三階 × 身上 6 把 × Boss 實測。** 一個 Three.js 單檔原型：猩猩背後漂著 6 把南瓜做的武器模型、34 把技能 × 5 元素 × 3 階 × 混搭規則全部能玩，再加一隻有骨架動畫的 Boss「CoffinHopper 骷髏球」來實測打擊感。
+**元素三階 × 身上 6 把 × Boss 實測。**
 
-- **線上試玩**：<https://terry12260201.github.io/gorilla-gun-sandbox-poc/>
-- **本機**：下載整個 repo，雙擊 `index.html`（file:// 直開即可，需連網載入 Three.js CDN）
-- **接手開發**：先讀 [`HANDOFF.md`](HANDOFF.md)
+一個 Three.js 單檔原型：猩猩背後漂著 6 把南瓜做的武器模型，34 把技能 × 5 元素 × 3 階 × 混搭規則全部能玩，再加一隻有骨架動畫的 Boss「CoffinHopper 骷髏球」來實測打擊感。介面套用「南瓜墨金美學 1.2」：淡紙承載面板，墨字建立順序，金色只指向下一步——召喚 Boss。
+
+![Three.js r128](https://img.shields.io/badge/Three.js-r128-161415?style=flat-square) ![單檔原型](https://img.shields.io/badge/單檔原型-file%3A%2F%2F%20可直開-2D2B2C?style=flat-square) ![南瓜墨金 1.2](https://img.shields.io/badge/介面-南瓜墨金%201.2-FDC302?style=flat-square&labelColor=2D2B2C)
+
+[線上試玩](https://terry12260201.github.io/gorilla-gun-sandbox-poc/) · [接手地圖 HANDOFF](HANDOFF.md) · [操作](#操作) · [元素表](#元素5-種--3-階主--副混搭) · [武器↔模型](#武器庫34-把身上帶-6-把-對應模型) · [Boss 規格](#bosscoffinhopper-骷髏球規格)
 
 ![身上 6 把武器模型（Knight 外觀＋模型展示組）](docs/screenshots/weapons-on-body.jpg)
 
 | Boss 跳砸紅圈預警 | Boss 死亡大爆炸 |
 |---|---|
-| ![](docs/screenshots/boss-slam-telegraph.jpg) | ![](docs/screenshots/boss-death-explosion.jpg) |
+| ![Boss 跳砸紅圈預警](docs/screenshots/boss-slam-telegraph.jpg) | ![Boss 死亡大爆炸](docs/screenshots/boss-death-explosion.jpg) |
 
----
+## 先開起來
+
+| 想做什麼 | 怎麼做 |
+|---|---|
+| 線上玩 | 打開 <https://terry12260201.github.io/gorilla-gun-sandbox-poc/> |
+| 本機玩 | 下載整個 repo，雙擊 `index.html`（file:// 直開即可，需連網載入 Three.js CDN） |
+| 接手開發 | 先讀 [`HANDOFF.md`](HANDOFF.md) |
+
+## 畫面怎麼看
+
+一張紙上放著三樣東西，各做自己的事。
+
+| 區塊 | 看起來 | 做什麼 |
+|---|---|---|
+| 左側面板 | 淺灰點格紙＋白卡（18px 圓角） | 所有設定：角色、元素、武器庫、打擊感、怪群 |
+| 上方 6 格 | 6 張白色小卡 | 身上帶的 6 把武器；點格子施放，灰色遮罩由下往上＝冷卻中 |
+| 舞台 | 深炭圓角區塊（32px 圓角） | 3D 遊戲畫面；Boss 血條、玩家 HP、特效計數、提示都疊在舞台上 |
+
+右上角的月亮／太陽切換淺色與深色，下次打開會記住。滑鼠在空白處移動，紙上的小點會往游標靠；停在按鈕旁，小點沿按鈕邊緣收攏。
+
+![桌機 1440px 墨金版](docs/screenshots/desktop-1440.jpg)
+
+| 深色模式 | 手機 375px |
+|---|---|
+| ![深色模式](docs/screenshots/desktop-night.jpg) | ![手機 375px](docs/screenshots/mobile-375.jpg) |
 
 ## 操作
 
@@ -20,9 +46,9 @@
 |---|---|
 | WASD／方向鍵 | 移動猩猩 |
 | Space | 雙手砸地 AOE |
-| **B** | **召喚 Boss**（面板也有按鈕） |
+| **B** | **召喚 Boss**（面板的金色按鈕也可以） |
 | 武器各自的鍵（見下表） | 手動施放；被動類（小幫手、聖光環）＝開關 |
-| 上方 6 格 | 點格子施放；格子底部金色＝冷卻中；格子裡是武器模型縮圖 |
+| 上方 6 格 | 點格子施放；格子底部灰色遮罩＝冷卻中；格子裡是武器模型縮圖 |
 | 面板勾選 | 勾＝裝備（最多 6 把）並自動施放 |
 | 面板「外觀」 | 程式生成猩猩／Rambo／Knight／Exorcist（預設 Rambo） |
 | 面板「快速換裝」 | VR 第一人稱組（原型預設）／模型展示組（6 把都有 GLB） |
@@ -30,8 +56,9 @@
 | 面板「無敵」 | 受擊仍有紅框與數字，但不扣血 |
 | 打擊感參數 → 第一人稱預覽 | 鏡頭放在猩猩頭上，看武器漂在身邊的 VR 感 |
 | 拖曳／滾輪 | 轉鏡頭／縮放 |
+| 右上角月亮／太陽 | 切換淺色／深色介面（舞台維持深炭） |
 
-> 改鍵：原本「陷阱」用 B，為了讓 B 給 Boss，陷阱改成 **1**。
+> **改鍵**：原本「陷阱」用 B，為了讓 B 給 Boss，陷阱改成 **1**。
 
 ## 元素：5 種 × 3 階，主 × 副混搭
 
@@ -55,11 +82,13 @@
 | 冰＋雷＝超導 | 電弧經過冰凍／減速的怪不衰減、多跳 2 次 |
 | 聖光＋X＝擴散 | 光柱把 X 的 I 階傳給周圍 1.3m 的怪 |
 
+面板上的元素按鈕前面有一顆小色點，就是該元素在遊戲裡的主色；選中的按鈕是墨底白字。
+
 ## 武器庫（34 把，身上帶 6 把）＋ 對應模型
 
 身上 6 把會在猩猩背後排成一圈、各自瞄準最近的怪；施放時有後座力（往後退＋槍口上揚）和槍口發光 pop。有模型的投射類技能會**從槍口射出**。
 
-對照表在 `index.html` 最上方的 `WEAPON_MODEL` 常數。貼合度：**貼合**＝語意直接對上；**借用**＝沒有專屬模型，先借最接近的一把當「發射器」；**程式生成**＝保留原本造型（身上槽位顯示 emoji）。
+對照表在 `index.html` 的 `WEAPON_MODEL` 常數。貼合度：**貼合**＝語意直接對上；**借用**＝沒有專屬模型，先借最接近的一把當「發射器」；**程式生成**＝保留原本造型（身上槽位顯示 emoji）。
 
 | 類型 | 武器 | 鍵 | 一句話 | 對應模型 | 貼合度 |
 |---|---|---|---|---|---|
@@ -102,7 +131,7 @@
 
 ## Boss：CoffinHopper 骷髏球（規格）
 
-主專案照同一份規格做。所有數字集中在 `index.html` 最上方的 `BOSS` 常數。
+主專案照同一份規格做。所有數字集中在 `index.html` 的 `BOSS` 常數。
 
 | 項目 | 規格 |
 |---|---|
@@ -119,12 +148,31 @@
 
 **玩家受擊**：原型本來沒有玩家 HP，這版加了簡單 HP 條（100）＋受擊紅框＋紅色傷害數字＋輕微被推開；HP 歸零 2 秒後復活。不震鏡頭（VR 舒適度）。只有 Boss 的攻擊會傷玩家，一般怪維持原型行為不攻擊。
 
+## 介面設計：南瓜墨金 1.2
+
+只換視覺層，遊戲邏輯與數值沒動。
+
+| 規則 | 這裡怎麼用 |
+|---|---|
+| 紙 `#F5F5F5`＋互動點格 | 頁面底；`vendor/ink-gold/ink-gold-ui.js` 畫磁吸點格，手機與「減少動態」時保留靜態點 |
+| 白卡 `#FFFFFF`、18px 圓角、1px 墨 8% 邊線 | 面板每一段（`<details>`）、上方 6 格 |
+| 墨 `#161415` 一色分層 | 標題 100%、說明 65%、必要小字 64%；選中的分段按鈕＝墨底白字 |
+| 金 `#FDC302 → #FFD83A` 只一個 | 全頁只有「召喚 Boss（B）」是金色；砸地按鈕降為墨色 |
+| 深炭舞台 `#2D2B2C → #242223`、32px 圓角 | 3D 畫面底色、地板、霧都換成深炭；HUD 用炭色半透明＋白字 |
+| 字體 | Roboto（英數）＋ Noto Sans TC（中文），離線時退回蘋方／微軟正黑；數字用 Roboto Mono |
+| 深淺切換 | 導覽列右側；記在 `localStorage.igTheme` |
+
+CSS 套件原樣內嵌在 `index.html` 的 `/* ink-gold kit:start */ … /* ink-gold kit:end */` 之間，本專案自己的版面規則接在後面，顏色一律用 `--ig-*` token。
+
 ## 檔案結構
 
 ```
-index.html               整個原型（單檔：HTML＋CSS＋JS）
+index.html               整個原型（HTML＋CSS＋JS；內嵌墨金 CSS 套件）
 models.js                自動產生：assets/**/*.glb 轉 base64（讓 file:// 也能載入），不要手改
 tools/build-models.mjs   產生 models.js 的小工具（Node 18+，無外部依賴）
+vendor/ink-gold/
+  ink-gold-ui.js         墨金互動點格＋深淺切換（從設計系統原樣複製）
+  pumpkin-logo-black.svg 南瓜正式 Logo（深色導覽以 CSS 反相成白色）
 assets/
   weapons/*.glb          11 把武器（槍管朝 +X）
   hero/player_*.glb      3 個猩猩玩家上半身（T-pose）
@@ -152,7 +200,7 @@ HANDOFF.md               給下一位開發者／AI 的架構地圖
 2. `applyOne()` 的 `switch` 加 `case '新元素':`，寫三階行為（只改行為、不只改數字）。
 3. 死亡行為寫在 `onDeathElements()`；持續狀態（DoT 等）寫在 `updateStatus()`，顏色加進 `statusColor()`／`tintOf()`／`bossSync()`。
 4. 要混搭規則就在 `COMPOUND` 加 `'a+b'`（字母排序）並在對應位置用 `hasCompound('a+b')` 判斷。
-5. 面板按鈕會自動從 `ELEM` 產生。
+5. 面板按鈕會自動從 `ELEM` 產生（按鈕前的小色點取 `main` 色）。
 
 ### 換模型／加模型
 
@@ -169,6 +217,13 @@ HANDOFF.md               給下一位開發者／AI 的架構地圖
 3. 改 `BOSS.model` 指向新 key（例：`'boss/new_boss'`），用 `BOSS.scale` 調大小、`BOSS.size` 調命中半徑。
 4. 招式節奏、傷害、距離都在 `BOSS` 常數；招式本身在 `bossTriShot()`、`bossRingShot()`、`bossShock()`；狀態機在 `updateBoss()`。
 
+### 改介面樣式
+
+1. 顏色、圓角、字體先找 `--ig-*` token（內嵌套件段），不要另外寫色碼。
+2. 本專案版面（面板寬、舞台、HUD、手機排法）在套件段後面的「Gorilla Gun 沙盒 POC · 工作區版面」。
+3. 金色維持只有一顆主按鈕；新增按鈕預設白底，次要主動作用 `class="ink"`。
+4. 設計系統更新時，把新版 `ink-gold.css` 整段貼回兩個 `kit` 標記之間，`ink-gold-ui.js` 覆蓋 `vendor/ink-gold/`。
+
 ## 測試法：`window.step(dt)`
 
 所有時間（特效、計時器、Boss 動畫 `AnimationMixer`）都由 `step(dt)` 推進，不讀系統時間，所以可以在 console 手動快轉，結果可重現：
@@ -181,7 +236,7 @@ boss.e.hp = boss.e.maxhp * .49;                 // 進階段 2
 W.god = true;                                   // 無敵
 ```
 
-背景分頁的瀏覽器會凍住 `requestAnimationFrame`，自動化截圖時一律用 `step()` 推進（截圖連拍兩張取第二張）。
+> **自動化截圖**：背景分頁的瀏覽器會凍住 `requestAnimationFrame`，一律用 `step()` 推進，截圖連拍兩張取第二張。
 
 ## 已知限制
 
@@ -190,8 +245,9 @@ W.god = true;                                   // 無敵
 - 「借用」的模型只是暫代，之後有專屬模型改 `WEAPON_MODEL` 即可；近身／召喚／場地類多數保留程式生成。
 - 武器縮放規則是統一公式（最長邊 ×1.9，夾在 0.62–1.25m），個別模型若要微調得另外加參數。
 - 只能同時有 1 隻 Boss；一般怪不會攻擊玩家。
-- 首次載入要下載 `models.js`（約 3 MB）與 Three.js CDN，離線無法開。
+- 首次載入要下載 `models.js`（約 3 MB）與 Three.js CDN，離線無法開；離線時網頁字體退回系統字（蘋方／微軟正黑），外觀會略有差異。
 - 第一人稱預覽時會隱藏英雄模型（T-pose 手臂會擋視線）。
+- 手機與平板直式（≤900px）沒有鍵盤，特效計數面板與鍵位說明會收起；格子名稱太長時以「…」截斷，滑鼠停留可看全名。
 
 ## 移植到 UE5／Quest 的對照
 
@@ -210,3 +266,7 @@ W.god = true;                                   // 無敵
 ## 模型縮圖一覽
 
 ![所有模型縮圖](assets/models-sheet.png)
+
+---
+
+Gorilla Gun 沙盒模式 POC · 南瓜虛擬科技 · 介面：南瓜墨金美學 1.2

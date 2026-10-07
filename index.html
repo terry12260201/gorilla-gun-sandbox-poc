@@ -1906,7 +1906,7 @@ function updateBossBar() {
   if (!boss) { el.style.display = 'none'; return; }
   const p = _bossTop.set(boss.pos.x, boss.y + 4.6, boss.pos.z).project(camera);
   if (p.z > 1) { el.style.display = 'none'; return; }
-  el.style.display = 'block'; el.style.left = (p.x * .5 + .5) * innerWidth + 'px'; el.style.top = (-p.y * .5 + .5) * innerHeight + 'px';
+  el.style.display = 'block'; el.style.left = (p.x * .5 + .5) * innerWidth + 'px'; el.style.top = Math.max(innerWidth > 720 ? 118 : 40, (-p.y * .5 + .5) * innerHeight) + 'px'; // 不蓋到上方 6 格
   $('#bossFill').style.width = clamp(boss.e.hp / boss.e.maxhp * 100, 0, 100).toFixed(1) + '%';
   $('#bossPhase').textContent = boss.e.dying ? '擊破' : `階段 ${boss.phase}｜${Math.max(0, Math.ceil(boss.e.hp * 10))}`;
 }

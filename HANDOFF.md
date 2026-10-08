@@ -14,7 +14,7 @@
 | 線上 | <https://terry12260201.github.io/gorilla-gun-sandbox-poc/>（push 到 `main` 自動更新） |
 | 改了 `assets/` | `node tools/build-models.mjs` → commit `models.js` |
 | 自動化測試 | console 呼叫 `step(1/30)` 推進時間（見下方） |
-| 載入成功的判斷 | 面板「角色與 Boss」右側顯示「模型 15/15 已載入」，console 無錯 |
+| 載入成功的判斷 | 面板「角色與 Boss」右側顯示「模型 16/16 已載入」，console 無錯 |
 | 深淺模式 | 導覽列右側月亮／太陽；記在 `localStorage.igTheme`，網址加 `?theme=night` 可直接開深色 |
 
 外部依賴（CDN，Three.js 版本鎖死 r128）：
@@ -87,9 +87,9 @@
 | 槽位排列 | `SLOT_OFFSETS`（x 右、y 高、z 前；負 z＝背後） |
 | 新元素／新混搭 | `ELEM`、`applyOne` 的 switch、`onDeathElements`、`updateStatus`、`COMPOUND`＋`hasCompound()` |
 | 新外觀 | `HERO_MODELS`＋面板 `<select id="look">`；大小 `HERO_FIT` |
-| Boss 數值 | `BOSS` 常數（節奏、傷害、距離、階段門檻） |
+| Boss 數值 | `BOSSES.coffin`／`BOSSES.snail`（節奏、傷害、距離、階段門檻）；`BOSS` 指向目前選的那隻 |
 | Boss 招式 | `updateBoss()` 的 `switch (b.state)` 加狀態；子彈用 `fireSkull()`；AOE 用 `bossShock()` |
-| 換 Boss 模型 | `BOSS.model`；需含 `Idle/Walk/Attack/Hit/Death` 五個 clip |
+| 換 Boss 模型／加 Boss | `BOSSES` 設定表加一筆（2026-10-09 起兩隻：coffin／snail）：`model`、`clips`（五個動作對應的 clip 名）、`hop`、`slam.charge`、`toxic`、`col`；面板 `#bossKind` 加一個 option |
 | 玩家受擊反饋 | `hurtPlayer()`、`updatePlayerHP()`、CSS `#hurt` |
 | 快速換裝組合 | `PRESETS`（UI 綁定區） |
 | 介面配色／字體 | 只改 `--ig-*` token（套件段）；本專案版面在「工作區版面」段，HUD 底色是 `--gg-hud` |

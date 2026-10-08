@@ -658,9 +658,10 @@ body.gg-app {
     <summary><span>角色與 Boss</span><small id="modelStatus">模型載入中…</small></summary>
     <div class="row"><label for="look">外觀</label><select id="look"><option value="proc">程式生成猩猩</option><option value="rambo" selected>Rambo</option><option value="knight">Knight</option><option value="exorcist">Exorcist</option></select></div>
     <div class="row"><label>快速換裝</label><div class="seg"><button type="button" id="presetVR">VR 第一人稱組</button><button type="button" id="presetGun">模型展示組</button></div></div>
+    <div class="row"><label for="bossKind">Boss</label><select id="bossKind"><option value="coffin" selected>💀 CoffinHopper 骷髏球</option><option value="snail">🐌 SNAIL 毒蝸牛</option></select></div>
     <div class="row"><button type="button" class="gold" id="bossBtn" style="flex:1">召喚 Boss（B）</button><button type="button" id="bossHalfBtn" title="測試用：直接把 Boss 打到 49% 進入階段 2">扣到半血</button></div>
     <div class="row"><label for="god">無敵（受擊仍有紅框，不扣血）</label><input type="checkbox" id="god"></div>
-    <div class="hint">Boss：CoffinHopper 骷髏球。彈跳保持 6–9m、每 3 秒骷髏三連彈、每 8 秒跳砸（紅圈預警 0.9 秒）；半血進階段 2：骷髏環射＋移速 ×1.3。</div>
+    <div class="hint" id="bossHint">CoffinHopper 骷髏球：彈跳保持 6–9m、每 3 秒骷髏三連彈、每 8 秒跳砸（紅圈預警 0.9 秒）；半血進階段 2：骷髏環射＋移速 ×1.3。</div>
   </details>
 
   <details open>
@@ -789,16 +790,36 @@ const SLOT_OFFSETS = [[-1.0, 1.95, -.5], [1.0, 1.95, -.5], [-1.6, 1.5, -.35], [1
 // 外觀：英雄模型（上半身 T-pose）。scale／y 讓它跟原本猩猩差不多大
 const HERO_MODELS = { rambo: 'hero/player_rambo', knight: 'hero/player_knight', exorcist: 'hero/player_exorcist' };
 const HERO_FIT = { scale: 1.35, y: .5, hand: [1.2, 1.05, .05] };
-// Boss：CoffinHopper 骷髏球（主專案照同一份規格做）
-const BOSS = {
-  model: 'boss/coffin_hopper', scale: 4.2, size: 1.6, // 模型原高 ~0.96 → ×4.2 ≈ 4m ≈ 猩猩 2.5 倍；size＝命中半徑基準
-  hpMul: 25,                       // HP ＝ brute(12) × 25 ＝ 300
-  speed: 3.2, keepMin: 6, keepMax: 9, hopH: .9,
-  tri: { every: 3, count: 3, spread: .32, speed: 6, homing: 1.1, dmg: 8 },          // 骷髏三連彈
-  slam: { every: 8, tele: .9, radius: 4, jump: .6, height: 5, dmg: 20 },          // 跳砸
-  phase2: { at: .5, ringEvery: 5, ringCount: 12, speedMul: 1.3, shockR: 8, shockDmg: 12 }, // 階段 2
-  hitAnimCd: 1.2,                  // Hit 動畫最短間隔（不打斷攻擊）
+// Boss 兩隻（主專案照同一份規格做）：CoffinHopper 骷髏球、SNAIL 毒蝸牛。面板可選，B 鍵召喚目前選的那隻。
+const BOSSES = {
+  coffin: {
+    kind: 'coffin', name: 'CoffinHopper 骷髏球', emoji: '💀',
+    model: 'boss/coffin_hopper', scale: 4.2, size: 1.6, barH: 4.6, mouth: [1.6, 2.2], // 模型原高 ~0.96 → ×4.2 ≈ 4m ≈ 猩猩 2.5 倍；size＝命中半徑基準
+    hpMul: 25,                       // HP ＝ brute(12) × 25 ＝ 300
+    speed: 3.2, keepMin: 6, keepMax: 9, hopH: .9, hop: true,
+    tri: { every: 3, count: 3, spread: .32, speed: 6, homing: 1.1, dmg: 8, shotName: '骷髏三連彈' }, // 骷髏三連彈
+    slam: { every: 8, tele: .9, radius: 4, jump: .6, height: 5, dmg: 20, charge: false },    // 跳砸
+    phase2: { at: .5, ringEvery: 5, ringCount: 12, speedMul: 1.3, shockR: 8, shockDmg: 12 }, // 階段 2
+    hitAnimCd: 1.2,                  // Hit 動畫最短間隔（不打斷攻擊）
+    clips: { idle: 'Idle', walk: 'Walk', attack: 'Attack', hit: 'Hit', death: 'Death', tele: 'Idle', jump: 'Walk' },
+    col: 0xb58cff, col2: 0x8cff3a, toxic: false,
+    hint: 'CoffinHopper 骷髏球：彈跳保持 6–9m、每 3 秒骷髏三連彈、每 8 秒跳砸（紅圈預警 0.9 秒）；半血進階段 2：骷髏環射＋移速 ×1.3。',
+  },
+  snail: {
+    kind: 'snail', name: 'SNAIL 毒蝸牛', emoji: '🐌',
+    model: 'boss/snail', scale: 1.0, size: 2.4, barH: 5.2, mouth: [2.6, 3.0], // 模型本身 4.6 m 高、6.6 m 長（Blender 匯出已是公尺）
+    hpMul: 50,                       // HP ＝ 600
+    speed: 2.2, keepMin: 4.5, keepMax: 7, hopH: 0, hop: false,
+    tri: { every: 4, count: 3, spread: .3, speed: 7, homing: .6, dmg: 7, shotName: '吐毒' },  // 吐毒三團，落地變毒池
+    slam: { every: 10, tele: .9, radius: 3.5, jump: .9, height: 0, dmg: 26, charge: true }, // 衝撞：綠圈預警→直線衝過去
+    phase2: { at: .5, ringEvery: 6, ringCount: 10, speedMul: 1.35, shockR: 7, shockDmg: 12 },
+    hitAnimCd: 1.4,
+    clips: { idle: 'Idle', walk: 'Walk', attack: 'Anim_Snail_SkillAttack', hit: 'Hit', death: 'Death', tele: 'Anim_Snail_AttackStart', jump: 'Anim_Snail_AttackMove' },
+    col: 0x6cff4a, col2: 0x1f6a12, toxic: true,
+    hint: 'SNAIL 毒蝸牛：慢慢爬保持 4.5–7m、每 4 秒吐 3 團毒液（落地變毒池，站在裡面持續扣血）、每 10 秒衝撞（綠圈一排預警 0.9 秒）；半血進階段 2：毒液環射＋移速 ×1.35。',
+  },
 };
+let BOSS = BOSSES.coffin;
 const PLAYER_HP = 100;
 
 // ───────────────────────── 元素設定 ─────────────────────────
@@ -1180,7 +1201,7 @@ const TYPES = {
   grunt: { hp: 4, size: .55, speed: 2.6, col: 0x5d6b78 },
   swarm: { hp: 2, size: .36, speed: 3.6, col: 0x6e8a5a },
   brute: { hp: 12, size: .92, speed: 1.7, col: 0x7a5a8a },
-  boss:  { hp: 12 * BOSS.hpMul, size: BOSS.size, speed: BOSS.speed, col: 0x8a5ac8 }, // 只由 summonBoss() 生成
+  boss:  { hp: 12 * 25, size: 1.6, speed: 3.2, col: 0x8a5ac8 }, // 只由 summonBoss() 生成；hp/size/speed 依 BOSS 覆寫
 };
 class Enemies {
   constructor(n) {
@@ -2330,19 +2351,19 @@ function summonBoss() {
   if (boss) { toast('Boss 已經在場上'); return; }
   const at = player.pos.clone().add(_v.set(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw)).multiplyScalar(11)); at.y = 0; // 生在鏡頭看出去的方向
   const e = enemies.spawn('boss', at); if (!e) { toast('怪物滿了，先清場'); return; }
-  e.boss = true; e.size = BOSS.size; e.speed = BOSS.speed;
+  e.boss = true; e.size = BOSS.size; e.speed = BOSS.speed; e.hp = e.maxhp = 12 * BOSS.hpMul;
   const model = THREE.SkeletonUtils.clone(g.scene), mats = [];
-  model.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.frustumCulled = false; mats.push(o.material); } });
+  model.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.frustumCulled = false; if (o.material.isMeshStandardMaterial) { o.material.roughness = 1; o.material.metalness = 0; } mats.push(o.material); } }); // 只要 BaseColor 的感覺：不反光
   model.scale.setScalar(BOSS.scale);
   const root = new THREE.Group(); root.add(model); scene.add(root);
   const mixer = new THREE.AnimationMixer(model), actions = {};
   for (const c of g.animations) actions[c.name] = mixer.clipAction(c);
-  boss = { e, root, model, mats, mixer, actions, cur: null, state: 'intro', st: 0, atkT: BOSS.tri.every, jumpT: BOSS.slam.every, ringT: 2, phase: 1, hitCd: 0,
+  boss = { e, root, model, mats, mixer, actions, cur: null, state: 'intro', st: 0, atkT: BOSS.tri.every, jumpT: BOSS.slam.every, ringT: 2, phase: 1, hitCd: 0, cfg: BOSS, pools: [],
     pos: at.clone(), y: 0, yaw: Math.atan2(player.pos.x - at.x, player.pos.z - at.z), strafe: 1, strafeT: 2.5, slamAt: new THREE.Vector3(), jumpFrom: new THREE.Vector3(), deathT: 0, ring: false };
-  mixer.addEventListener('finished', ev => { if (!boss || boss.e.dying) return; if (ev.action === boss.actions.Hit || ev.action === boss.actions.Attack) bossPlay(boss.state === 'move' ? 'Walk' : 'Idle'); });
-  bossPlay('Idle');
-  pillars.spawn(at, 1.2, 9, BOSS_PURPLE, .7); ringAt(at, 5, BOSS_PURPLE, .7, .08); crackAt(at, 4, BOSS_GREEN, 2.4); flashScreen(.12);
-  toast('💀 <b>CoffinHopper 骷髏球</b> 出現了');
+  mixer.addEventListener('finished', ev => { if (!boss || boss.e.dying) return; if (ev.action === boss.actions[BOSS.clips.hit] || ev.action === boss.actions[BOSS.clips.attack]) bossPlay(boss.state === 'move' ? BOSS.clips.walk : BOSS.clips.idle); });
+  bossPlay(BOSS.clips.idle);
+  pillars.spawn(at, 1.2, 9, bossCol(), .7); ringAt(at, 5, bossCol(), .7, .08); crackAt(at, 4, bossCol2(), 2.4); flashScreen(.12);
+  $('#bossBar .nm').firstChild.textContent = BOSS.name; toast(`${BOSS.emoji} <b>${BOSS.name}</b> 出現了`);
 }
 function bossPlay(name, once = false, fade = .15, ts = 1) {
   const a = boss.actions[name]; if (!a) return;
@@ -2351,22 +2372,24 @@ function bossPlay(name, once = false, fade = .15, ts = 1) {
   if (boss.cur && boss.cur !== a) a.crossFadeFrom(boss.cur, fade, false);
   boss.cur = a;
 }
+const _bc = new THREE.Color(), _bc2 = new THREE.Color();
+const bossCol = () => _bc.setHex(BOSS.col), bossCol2 = () => _bc2.setHex(BOSS.col2);
 function bossOnHit(e) { // 被打：短 Hit（只在移動狀態、有冷卻，不打斷攻擊）
   if (!boss || e !== boss.e || e.dying) return;
-  if (boss.state === 'move' && boss.hitCd <= 0 && e.frozen <= 0) { boss.hitCd = BOSS.hitAnimCd; bossPlay('Hit', true, .08); }
+  if (boss.state === 'move' && boss.hitCd <= 0 && e.frozen <= 0) { boss.hitCd = BOSS.hitAnimCd; bossPlay(BOSS.clips.hit, true, .08); }
 }
 function bossSetState(s) { boss.state = s; boss.st = 0; }
 function bossFace(dt, k = 8) { const want = Math.atan2(player.pos.x - boss.pos.x, player.pos.z - boss.pos.z); let d = want - boss.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); boss.yaw += d * (1 - Math.exp(-k * dt)); }
-function bossMouth() { return new THREE.Vector3(boss.pos.x + Math.sin(boss.yaw) * 1.6, boss.y + 2.2, boss.pos.z + Math.cos(boss.yaw) * 1.6); }
+function bossMouth() { const [f, h] = BOSS.mouth; return new THREE.Vector3(boss.pos.x + Math.sin(boss.yaw) * f, boss.y + h, boss.pos.z + Math.cos(boss.yaw) * f); }
 function bossTriShot() {
   const from = bossMouth(), base = Math.atan2(player.pos.x - from.x, player.pos.z - from.z), T = BOSS.tri;
   for (let i = 0; i < T.count; i++) { const a = base + (i - (T.count - 1) / 2) * T.spread; fireSkull(from, new THREE.Vector3(Math.sin(a), -.08, Math.cos(a)), T.speed, T.homing, T.dmg); }
-  bursts.spawn(from, 1.2, BOSS_PURPLE, .2);
+  bursts.spawn(from, 1.2, bossCol(), .2);
 }
 function bossRingShot() {
   const from = bossMouth().setY(boss.y + 1.6), P = BOSS.phase2;
   for (let i = 0; i < P.ringCount; i++) { const a = boss.yaw + i * TAU / P.ringCount; fireSkull(from, new THREE.Vector3(Math.sin(a), 0, Math.cos(a)), BOSS.tri.speed * .9, 0, BOSS.tri.dmg); }
-  ringAt(boss.pos, 3.5, BOSS_GREEN, .5, .1); bursts.spawn(from, 1.6, BOSS_GREEN, .25);
+  ringAt(boss.pos, 3.5, bossCol2(), .5, .1); bursts.spawn(from, 1.6, bossCol2(), .25);
 }
 function bossShock(c, r, dmg, col) { // 落地震波：沿用 ① 震波環＋⑥ 地裂
   ringAt(c, r, col, .55, .09); ringAt(c, r * .5, WHITE, .3, .16); crackAt(c, r * .85, col, 2.2); bursts.spawn(_v2.copy(c).setY(.5), r * .45, col, .25); pillars.spawn(c, .8, 4, col, .3); flashScreen(.14);
@@ -2378,48 +2401,54 @@ function updateBoss(e, dt) {
   const b = boss; if (!b || b.e !== e) { e.alive = false; return; }
   e.lift = 0; e.vel.set(0, 0, 0); b.st += dt; b.hitCd -= dt;
   if (e.dying) { // 死亡：播 Death（三顆骷髏噴出）→ 播完大爆炸＋金色碎塊飛向玩家
-    if (b.state !== 'dying') { bossSetState('dying'); bossPlay('Death', true, .1); toast('💀 <b>CoffinHopper</b> 倒下！'); }
+    if (b.state !== 'dying') { bossSetState('dying'); bossPlay(BOSS.clips.death, true, .1); toast(`${BOSS.emoji} <b>${BOSS.name}</b> 倒下！`); }
     b.y = Math.max(0, b.y - dt * 8); b.mixer.update(dt); bossSync(e, dt);
-    if (b.st >= b.actions.Death.getClip().duration + .1) bossExplode(e);
+    if (b.st >= b.actions[BOSS.clips.death].getClip().duration + .1) bossExplode(e);
     return;
   }
   updateStatus(e, dt);
   if (e.hp <= 0) { e.dying = true; e.deathCol.copy(statusColor(e)); return; }
   if (b.phase === 1 && e.hp < e.maxhp * BOSS.phase2.at) { // 進階段 2：一次大震波
-    b.phase = 2; b.ringT = 1.5; bossShock(b.pos, BOSS.phase2.shockR, BOSS.phase2.shockDmg, BOSS_PURPLE); toast('💀 Boss 進入<b>階段 2</b>：骷髏環射＋加速');
+    b.phase = 2; b.ringT = 1.5; bossShock(b.pos, BOSS.phase2.shockR, BOSS.phase2.shockDmg, bossCol()); toast(`${BOSS.emoji} Boss 進入<b>階段 2</b>：${BOSS.toxic ? '毒液環射' : '骷髏環射'}＋加速`);
   }
   if (e.frozen > 0) { b.mixer.timeScale = 0; bossSync(e, dt); return; } // 凍住：動畫停格、AI 暫停
   const slow = Math.min(e.slow, .5); b.mixer.timeScale = 1 - slow * .6;
   const spd = BOSS.speed * (b.phase === 2 ? BOSS.phase2.speedMul : 1) * (1 - slow);
   b.atkT -= dt; b.jumpT -= dt; if (b.phase === 2) b.ringT -= dt;
   switch (b.state) {
-    case 'intro': bossFace(dt); if (b.st > .8) { bossSetState('move'); bossPlay('Walk'); } break;
+    case 'intro': bossFace(dt); if (b.st > .8) { bossSetState('move'); bossPlay(BOSS.clips.walk); } break;
     case 'move': {
       bossFace(dt);
       _v.subVectors(player.pos, b.pos).setY(0); const d = _v.length(); _v.normalize();
       b.strafeT -= dt; if (b.strafeT <= 0) { b.strafeT = rnd(3.5, 2); b.strafe *= -1; }
       if (d > BOSS.keepMax) _d.copy(_v); else if (d < BOSS.keepMin) _d.copy(_v).negate(); else _d.set(-_v.z * b.strafe, 0, _v.x * b.strafe);
-      const ph = b.actions.Walk.time / b.actions.Walk.getClip().duration, hop = Math.sin(ph * Math.PI); // 一個 Walk 循環＝一跳
-      b.y = hop * BOSS.hopH;
-      b.pos.addScaledVector(_d, spd * dt * (.35 + hop * 1.3) * (e.root > 0 ? .3 : 1)); // 空中才往前衝＝彈跳前進；Boss 被定身只減速 70%，不會被網／地獄手永久定住
-      if (b.jumpT <= 0) { bossSetState('tele'); b.slamAt.copy(player.pos).setY(0); ringAt(b.slamAt, BOSS.slam.radius, WARN_RED, BOSS.slam.tele, .05); discAt(b.slamAt, BOSS.slam.radius, WARN_RED, BOSS.slam.tele + .15); bossPlay('Idle', false, .1, 2); }
-      else if (b.atkT <= 0) { bossSetState('attack'); b.ring = false; bossPlay('Attack', true, .1); after(.45, () => boss && !boss.e.dying && bossTriShot()); }
-      else if (b.phase === 2 && b.ringT <= 0) { bossSetState('attack'); b.ring = true; bossPlay('Attack', true, .1); after(.45, () => boss && !boss.e.dying && bossRingShot()); }
+      const wa = b.actions[BOSS.clips.walk], ph = wa.time / wa.getClip().duration, hop = BOSS.hop ? Math.sin(ph * Math.PI) : .5; // 骷髏球：一個 Walk 循環＝一跳；蝸牛：等速爬
+      b.y = BOSS.hop ? hop * BOSS.hopH : 0;
+      b.pos.addScaledVector(_d, spd * dt * (BOSS.hop ? .35 + hop * 1.3 : 1) * (e.root > 0 ? .3 : 1)); // 空中才往前衝＝彈跳前進；Boss 被定身只減速 70%，不會被網／地獄手永久定住
+      if (BOSS.toxic && Math.random() < dt * 2) sparks.spawn(_v2.set(b.pos.x + rnd(1, -1), .15, b.pos.z + rnd(1, -1)), _v.set(0, rnd(.8, .2), 0), bossCol2(), .6, .8, { grav: -.5, drag: .98 }); // 黏液泡泡
+      if (b.jumpT <= 0) { bossSetState('tele'); b.slamAt.copy(player.pos).setY(0);
+        if (BOSS.slam.charge) { _d.subVectors(b.slamAt, b.pos).setY(0).normalize(); b.slamAt.copy(b.pos).addScaledVector(_d, Math.min(16, _v.subVectors(player.pos, b.pos).setY(0).length() + 3)); for (let i = 1; i <= 6; i++) { _v2.copy(b.pos).addScaledVector(_d, i * 2.6); ringAt(_v2, 2.2, bossCol(), BOSS.slam.tele, .06); } } // 衝撞：一排綠圈
+        else { ringAt(b.slamAt, BOSS.slam.radius, WARN_RED, BOSS.slam.tele, .05); discAt(b.slamAt, BOSS.slam.radius, WARN_RED, BOSS.slam.tele + .15); }
+        bossPlay(BOSS.clips.tele, BOSS.slam.charge, .1, BOSS.slam.charge ? 1 : 2); }
+      else if (b.atkT <= 0) { bossSetState('attack'); b.ring = false; bossPlay(BOSS.clips.attack, true, .1); after(.45, () => boss && !boss.e.dying && bossTriShot()); }
+      else if (b.phase === 2 && b.ringT <= 0) { bossSetState('attack'); b.ring = true; bossPlay(BOSS.clips.attack, true, .1); after(.45, () => boss && !boss.e.dying && bossRingShot()); }
       break;
     }
     case 'attack': bossFace(dt, 4); b.y = Math.max(0, b.y - dt * 6);
-      if (b.st >= b.actions.Attack.getClip().duration * .85) { if (b.ring) b.ringT = BOSS.phase2.ringEvery; else b.atkT = BOSS.tri.every; bossSetState('move'); bossPlay('Walk'); }
+      if (b.st >= b.actions[BOSS.clips.attack].getClip().duration * .85) { if (b.ring) b.ringT = BOSS.phase2.ringEvery; else b.atkT = BOSS.tri.every; bossSetState('move'); bossPlay(BOSS.clips.walk); }
       break;
-    case 'tele': bossFace(dt, 4); b.y = Math.max(0, b.y - dt * 6); // 紅圈預警 0.9 秒（圈在玩家腳下的「當時位置」）
-      if (b.st >= BOSS.slam.tele) { bossSetState('jump'); b.jumpFrom.copy(b.pos); bossPlay('Walk', false, .1, 1.6); }
+    case 'tele': if (!BOSS.slam.charge) bossFace(dt, 4); b.y = Math.max(0, b.y - dt * 6); // 預警 0.9 秒（骷髏球：紅圈在玩家腳下；蝸牛：一排綠圈標出衝撞路線）
+      if (b.st >= BOSS.slam.tele) { bossSetState('jump'); b.jumpFrom.copy(b.pos); bossPlay(BOSS.clips.jump, BOSS.slam.charge, .1, 1.6); }
       break;
     case 'jump': { const k = clamp(b.st / BOSS.slam.jump, 0, 1);
-      b.pos.lerpVectors(b.jumpFrom, b.slamAt, k * k * (3 - 2 * k)); b.y = Math.sin(k * Math.PI) * BOSS.slam.height;
-      if (Math.random() < .5) sparks.spawn(_v2.set(b.pos.x, b.y + 1, b.pos.z), _v.set(rnd(1, -1), -1, rnd(1, -1)), BOSS_PURPLE, .6, .4, { grav: 2 });
-      if (k >= 1) { b.y = 0; bossShock(b.slamAt, BOSS.slam.radius, BOSS.slam.dmg, BOSS_PURPLE); bossSetState('land'); bossPlay('Idle', false, .1); }
+      b.pos.lerpVectors(b.jumpFrom, b.slamAt, BOSS.slam.charge ? k : k * k * (3 - 2 * k)); b.y = Math.sin(k * Math.PI) * BOSS.slam.height;
+      if (Math.random() < .5) sparks.spawn(_v2.set(b.pos.x, b.y + 1, b.pos.z), _v.set(rnd(1, -1), -1, rnd(1, -1)), bossCol(), .6, .4, { grav: 2 });
+      if (BOSS.slam.charge) { if (Math.random() < dt * 20) ringAt(b.pos, 1.6, bossCol2(), .3, .1); if (!b.chargeHit && _v.subVectors(player.pos, b.pos).setY(0).length() < 3) { b.chargeHit = true; hurtPlayer(BOSS.slam.dmg, b.pos); } } // 衝撞途中撞到就扣血
+      if (k >= 1) { b.y = 0; b.chargeHit = false; bossShock(b.slamAt, BOSS.slam.radius, BOSS.slam.charge ? 0 : BOSS.slam.dmg, bossCol()); bossSetState('land'); bossPlay(BOSS.clips.idle, false, .1); }
       break; }
-    case 'land': if (b.st >= .6) { b.jumpT = BOSS.slam.every; bossSetState('move'); bossPlay('Walk'); } break;
+    case 'land': if (b.st >= .6) { b.jumpT = BOSS.slam.every; bossSetState('move'); bossPlay(BOSS.clips.walk); } break;
   }
+  for (let i = b.pools.length - 1; i >= 0; i--) { const q = b.pools[i]; q.t += dt; q.tick -= dt; if (q.t >= q.dur) { b.pools.splice(i, 1); continue; } if (Math.random() < dt * 6) sparks.spawn(_v2.set(q.pos.x + rnd(2, -2), .1, q.pos.z + rnd(2, -2)), _v.set(0, rnd(1.5, .5), 0), bossCol(), .4, .8, { grav: -1, drag: .98 }); if (q.tick <= 0 && _v.subVectors(player.pos, q.pos).setY(0).length() < q.r) { q.tick = .5; hurtPlayer(3, q.pos); } } // 毒池：站在裡面每 0.5 秒扣血
   b.mixer.update(dt); bossSync(e, dt);
 }
 function bossSync(e, dt) {
@@ -2433,17 +2462,19 @@ function bossSync(e, dt) {
     _c.copy(m.userData.baseEm);
     if (e.burnT > 0) _c.lerp(EC('fire'), .35); if (e.poisonT > 0) _c.lerp(EC('toxic'), .3); if (e.chill > 0) _c.lerp(EC('ice'), .3);
     if (e.cond > 0) _c.lerp(EC('volt'), .3); if (e.mark > 0) _c.lerp(EC('holy'), .12 * e.mark); if (e.frozen > 0) _c.lerp(PALE_ICE, .7);
-    if (b.phase === 2) _c.lerp(BOSS_PURPLE, .15);
+    if (b.phase === 2) _c.lerp(bossCol(), .15);
     m.emissive.copy(_c).multiplyScalar(1 + e.flash * 1.4);
   }
+  if (BOSS.toxic) for (const m of b.mats) if (m.color) { if (!m.userData.baseCol) m.userData.baseCol = m.color.clone(); _c.copy(m.userData.baseCol); if (b.phase === 2) _c.lerp(bossCol(), .2); if (e.frozen > 0) _c.lerp(PALE_ICE, .6); m.color.copy(_c).lerp(WHITE, Math.min(1, e.flash * 1.2)); } // 蝸牛是一般材質：用 color 混白當受擊閃白
 }
 function bossExplode(e) {
   const b = boss, c = _v2.copy(b.pos).setY(1.5);
-  flashScreen(.3); bursts.spawn(c, 4.5, WHITE, .4); bursts.spawn(c, 3, BOSS_PURPLE, .5);
-  ringAt(b.pos, 9, BOSS_PURPLE, .7, .07); ringAt(b.pos, 5, BOSS_GREEN, .5, .12); ringAt(b.pos, 2.5, WHITE, .3, .2); crackAt(b.pos, 6, BOSS_PURPLE, 3); pillars.spawn(b.pos, 1.6, 12, BOSS_PURPLE, .7);
-  for (let i = 0; i < 90; i++) sparks.spawn(c, _v.set(rnd(1, -1), rnd(1.6, .2), rnd(1, -1)).normalize().multiplyScalar(rnd(16, 5)), i % 3 === 0 ? BOSS_GREEN : i % 3 === 1 ? BOSS_PURPLE : new THREE.Color(0xe8e2d0), rnd(2.4, 1), rnd(1.4, .7), { grav: 12 });
+  const c1 = bossCol().clone(), c2 = bossCol2().clone();
+  flashScreen(.3); bursts.spawn(c, 4.5, WHITE, .4); bursts.spawn(c, 3, c1, .5);
+  ringAt(b.pos, 9, c1, .7, .07); ringAt(b.pos, 5, c2, .5, .12); ringAt(b.pos, 2.5, WHITE, .3, .2); crackAt(b.pos, 6, c1, 3); pillars.spawn(b.pos, 1.6, 12, c1, .7);
+  for (let i = 0; i < 90; i++) sparks.spawn(c, _v.set(rnd(1, -1), rnd(1.6, .2), rnd(1, -1)).normalize().multiplyScalar(rnd(16, 5)), i % 3 === 0 ? c2 : i % 3 === 1 ? c1 : new THREE.Color(0xe8e2d0), rnd(2.4, 1), rnd(1.4, .7), { grav: 12 });
   for (let i = 0; i < 70; i++) { _v.set(rnd(1, -1), rnd(1.8, .8), rnd(1, -1)).normalize().multiplyScalar(rnd(9, 4)); sparks.spawn(c, _v, GOLD, rnd(1.6, 1), 4, { grav: 9, drag: .985, target: player.pos, delay: rnd(.9, .35) }); }
-  for (const n of enemies.within(b.pos, 6)) if (!n.boss) { _hv.subVectors(n.pos, b.pos).setY(0).normalize(); enemies.hit(n, 6, _hv, BOSS_PURPLE, { knock: 12, fxScale: 1, lift: 1, noElem: true }); }
+  for (const n of enemies.within(b.pos, 6)) if (!n.boss) { _hv.subVectors(n.pos, b.pos).setY(0).normalize(); enemies.hit(n, 6, _hv, c1, { knock: 12, fxScale: 1, lift: 1, noElem: true }); }
   onDeathElements(e);
   scene.remove(b.root); b.mixer.stopAllAction();
   e.alive = false; enemies.kills++; enemies.killLog.push(performance.now()); boss = null;
@@ -2455,32 +2486,37 @@ const skullMat = new THREE.MeshStandardMaterial({ color: 0xe9e3d2, roughness: .6
 const skullEyeMat = new THREE.MeshBasicMaterial({ color: 0x8cff3a });
 const skullHaloMat = new THREE.MeshBasicMaterial({ color: 0x8cff3a, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false });
 const bossShots = [];
+const blobMat = new THREE.MeshStandardMaterial({ color: 0x2f8a16, roughness: .4, emissive: 0x6cff4a, emissiveIntensity: .8 });
+const blobHaloMat = new THREE.MeshBasicMaterial({ color: 0x6cff4a, transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false });
 function fireSkull(from, dir, speed, homing, dmg) {
-  const g = new THREE.Group(); g.add(new THREE.Mesh(skullGeo, skullMat));
-  for (const x of [-.11, .11]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), skullEyeMat); eye.position.set(x, .02, .26); g.add(eye); }
-  g.add(new THREE.Mesh(new THREE.SphereGeometry(.5, 12, 10), skullHaloMat));
+  const g = new THREE.Group(), toxic = !!BOSS.toxic;
+  if (toxic) { g.add(new THREE.Mesh(new THREE.SphereGeometry(.34, 10, 8), blobMat)); g.add(new THREE.Mesh(new THREE.SphereGeometry(.55, 12, 10), blobHaloMat)); } // 毒液球
+  else { g.add(new THREE.Mesh(skullGeo, skullMat)); for (const x of [-.11, .11]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(.07, 8, 6), skullEyeMat); eye.position.set(x, .02, .26); g.add(eye); } g.add(new THREE.Mesh(new THREE.SphereGeometry(.5, 12, 10), skullHaloMat)); }
   g.position.copy(from); scene.add(g);
-  bossShots.push({ g, vel: dir.clone().normalize().multiplyScalar(speed), speed, homing, dmg, t: 0 });
+  bossShots.push({ g, vel: dir.clone().normalize().multiplyScalar(speed), speed, homing, dmg, t: 0, toxic, grav: toxic ? 6 : 0 });
 }
 function updateBossShots(dt) {
   const tgt = _d.copy(player.pos).setY(1.1);
   for (let i = bossShots.length - 1; i >= 0; i--) {
     const s = bossShots[i]; s.t += dt;
     if (s.homing > 0) { _v.subVectors(tgt, s.g.position).normalize().multiplyScalar(s.speed); s.vel.lerp(_v, 1 - Math.exp(-s.homing * dt)).setLength(s.speed); }
+    if (s.grav) s.vel.y -= s.grav * dt;
     s.g.position.addScaledVector(s.vel, dt); s.g.lookAt(_v.copy(s.g.position).add(s.vel)); s.g.rotateZ(Math.sin(s.t * 12) * .2);
-    if (Math.random() < .7) sparks.spawn(s.g.position, _v.set(rnd(.5, -.5), rnd(.5, -.5), rnd(.5, -.5)), Math.random() < .5 ? BOSS_GREEN : BOSS_PURPLE, .5, .35, { grav: 0, drag: .9 });
+    if (Math.random() < .7) sparks.spawn(s.g.position, _v.set(rnd(.5, -.5), rnd(.5, -.5), rnd(.5, -.5)), s.toxic ? (Math.random() < .5 ? bossCol() : bossCol2()) : (Math.random() < .5 ? BOSS_GREEN : BOSS_PURPLE), .5, .35, { grav: 0, drag: .9 });
     let gone = s.t > 6 || s.g.position.y < .1;
     const d = s.g.position.distanceTo(tgt);
     if (!gone && shieldState && _v.subVectors(s.g.position, player.pos).setY(0).length() < 2.7) { shieldState.hp--; shieldState.hit = 1; ringAt(s.g.position, 1, C('main'), .25, .2); gone = true; }
     else if (!gone && d < .95) { hurtPlayer(s.dmg, s.g.position); gone = true; }
-    if (gone) { bursts.spawn(s.g.position, .8, BOSS_GREEN, .2); for (let k = 0; k < 8; k++) sparks.spawn(s.g.position, _v.set(rnd(1, -1), rnd(1, -1), rnd(1, -1)).multiplyScalar(4), k % 2 ? BOSS_PURPLE : BOSS_GREEN, .6, .4, { grav: 6 }); scene.remove(s.g); bossShots.splice(i, 1); }
+    if (gone) { const cc = s.toxic ? bossCol() : BOSS_GREEN, cc2 = s.toxic ? bossCol2() : BOSS_PURPLE; bursts.spawn(s.g.position, .8, cc, .2); for (let k = 0; k < 8; k++) sparks.spawn(s.g.position, _v.set(rnd(1, -1), rnd(1, -1), rnd(1, -1)).multiplyScalar(4), k % 2 ? cc2 : cc, .6, .4, { grav: 6 });
+      if (s.toxic && boss) { const p = s.g.position.clone().setY(0); discAt(p, 2.4, bossCol2(), 4); ringAt(p, 2.4, bossCol(), .4, .12); boss.pools.push({ pos: p, r: 2.4, t: 0, dur: 4, tick: 0 }); } // 毒液落地→毒池 4 秒
+      scene.remove(s.g); bossShots.splice(i, 1); }
   }
 }
 const _bossTop = new THREE.Vector3();
 function updateBossBar() {
   const el = $('#bossBar');
   if (!boss) { el.style.display = 'none'; return; }
-  const p = _bossTop.set(boss.pos.x, boss.y + 4.6, boss.pos.z).project(camera);
+  const p = _bossTop.set(boss.pos.x, boss.y + BOSS.barH, boss.pos.z).project(camera);
   if (p.z > 1) { el.style.display = 'none'; return; }
   el.style.display = 'block'; el.style.left = (p.x * .5 + .5) * canvas.clientWidth + 'px'; el.style.top = Math.max(88, (-p.y * .5 + .5) * canvas.clientHeight) + 'px'; // 座標相對舞台；不蓋到上方 toast
   $('#bossFill').style.width = clamp(boss.e.hp / boss.e.maxhp * 100, 0, 100).toFixed(1) + '%';
@@ -2556,6 +2592,9 @@ $('#slamBtn').addEventListener('click', slam);
 $('#look').addEventListener('change', e => { W.look = e.target.value; applyLook(); });
 $('#bossBtn').addEventListener('click', summonBoss);
 $('#bossHalfBtn').addEventListener('click', () => { if (!boss) { toast('先召喚 Boss（B）'); return; } boss.e.hp = Math.min(boss.e.hp, boss.e.maxhp * .49); });
+$('#bossKind').addEventListener('change', e => { BOSS = BOSSES[e.target.value] || BOSSES.coffin; $('#bossHint').textContent = BOSS.hint; if (boss) toast('下一隻召喚才會換成 ' + BOSS.name); });
+if (new URLSearchParams(location.search).get('boss') in BOSSES) { BOSS = BOSSES[new URLSearchParams(location.search).get('boss')]; $('#bossKind').value = BOSS.kind; $('#bossHint').textContent = BOSS.hint; }
+if (new URLSearchParams(location.search).has('summon')) setTimeout(() => { if (MODELS.gltf[BOSS.model]) summonBoss(); else setTimeout(summonBoss, 2500); }, 1500); // ?boss=snail&summon：載入後自動召喚（測試用）
 const PRESETS = { presetVR: ['flame', 'shield', 'hole', 'javelin', 'hydra', 'storm'], presetGun: ['shotgun', 'missiles', 'gas', 'flame', 'beam', 'web'] };
 for (const id in PRESETS) $('#' + id).addEventListener('click', () => { WEAPONS.forEach(w => { w.on = false; $('#w_' + w.id).checked = false; }); PRESETS[id].forEach(k => { const w = WEAPONS.find(w => w.id === k); w.on = true; $('#w_' + k).checked = true; }); rebuildSlots(); assignBodySlots(); toast(id === 'presetVR' ? '換成 <b>VR 第一人稱組</b>' : '換成 <b>模型展示組</b>'); });
 loadModels();

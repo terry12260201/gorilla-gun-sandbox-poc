@@ -2,7 +2,7 @@
 
 **元素三階 × 身上 6 把 × Boss 實測。**
 
-一個 Three.js 單檔原型：猩猩背後漂著 6 把南瓜做的武器模型，34 把技能 × 5 元素 × 3 階 × 混搭規則全部能玩，再加一隻有骨架動畫的 Boss「CoffinHopper 骷髏球」來實測打擊感。介面套用「南瓜墨金美學 1.2」：淡紙承載面板，墨字建立順序，金色只指向下一步——召喚 Boss。
+猩猩背後漂著 6 把南瓜做的武器模型，34 把技能 × 5 元素 × 3 階 × 混搭規則全部能玩，再加一隻有骨架動畫的 Boss「CoffinHopper 骷髏球」來實測打擊感。
 
 ![Three.js r128](https://img.shields.io/badge/Three.js-r128-161415?style=flat-square) ![單檔原型](https://img.shields.io/badge/單檔原型-file%3A%2F%2F%20可直開-2D2B2C?style=flat-square) ![南瓜墨金 1.2](https://img.shields.io/badge/介面-南瓜墨金%201.2-FDC302?style=flat-square&labelColor=2D2B2C)
 
